@@ -4,15 +4,20 @@ var Dashboard = Dashboard || {};
 Dashboard.gradingAPI = (function() {
     var controllers = [];
 
-    function buildSystemPrompt(rubric) {
-        var criteria = rubric.criteria.map(function(c) {
-            return '- ' + c.name + ' (max ' + c.maxPoints + ' points): ' + c.description;
-        }).join('\n');
+    function buildSystemPrompt(state) {
+        var prompt =
+            'You are a strict academic grader. Grade the following student submission according to ' +
+            'the assignment and rubric below. You MUST respond with ONLY valid JSON, no markdown, ' +
+            'no code fences.\n\n' +
+            'ASSIGNMENT:\n' + (state.assignment.text || '(not provided)') + '\n\n' +
+            'RUBRIC:\n' + state.rubric.text;
 
-        return 'You are a strict academic grader. Grade the following submission ' +
-            'according to the rubric below. You MUST respond with ONLY valid JSON, ' +
-            'no markdown, no explanation, no code fences.\n\n' +
-            'Rubric (total: ' + rubric.totalPoints + ' points):\n' + criteria + '\n\n' +
+        if (state.exampleAnswer.text) {
+            prompt += '\n\nEXAMPLE ANSWER:\n' + state.exampleAnswer.text;
+        }
+
+        prompt +=
+            '\n\nIdentify the grading criteria from the rubric. For each criterion assign a score.\n\n' +
             'Required JSON format:\n' +
             '{\n' +
             '  "criteria": [\n' +
@@ -22,22 +27,24 @@ Dashboard.gradingAPI = (function() {
             '  "overallFeedback": "1-3 sentence summary"\n' +
             '}\n\n' +
             'Rules:\n' +
+            '- Extract criteria and their point values directly from the rubric\n' +
             '- Score each criterion from 0 to its maxScore\n' +
             '- Be fair but rigorous\n' +
-            '- Feedback should be specific and actionable\n' +
             '- Do NOT include any text outside the JSON object';
+
+        return prompt;
     }
 
-    function grade(rubric, submission, onResult, onError) {
+    function grade(state, submission, onResult, onError) {
         var controller = new AbortController();
         controllers.push(controller);
 
-        var systemMsg = buildSystemPrompt(rubric);
-        var userMsg = 'Submission from: ' + submission.name + '\n\n' +
+        var systemMsg = buildSystemPrompt(state);
+        var userMsg = 'Student: ' + submission.name + ' (ID: ' + submission.studentId + ')\n\n' +
             '--- BEGIN SUBMISSION ---\n' + submission.content + '\n--- END SUBMISSION ---';
 
         var body = {
-            model: rubric.model,
+            model: 'gpt-5.1',
             messages: [
                 { role: 'system', content: systemMsg },
                 { role: 'user', content: userMsg }
@@ -88,7 +95,6 @@ Dashboard.gradingAPI = (function() {
     }
 
     function parseGradingResponse(content) {
-        /* Strip markdown code fences if present */
         var cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
         cleaned = cleaned.trim();
 
@@ -102,7 +108,6 @@ Dashboard.gradingAPI = (function() {
             return { error: 'Response missing "criteria" array' };
         }
 
-        /* Validate and compute total score */
         var totalScore = 0;
         var totalMax = 0;
         for (var i = 0; i < obj.criteria.length; i++) {

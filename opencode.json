@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "provider": {
     "uva-proxy": {
       "npm": "@ai-sdk/openai-compatible",
@@ -8,6 +9,41 @@
         "apiKey": "{env:UVA_PROXY_API_KEY}"
       },
       "models": {
+        "gpt-5": {
+          "name": "GPT-5",
+          "limit": {
+            "context": 128000,
+            "output": 16384
+          }
+        },
+        "gpt-5.1": {
+          "name": "GPT-5.1",
+          "limit": {
+            "context": 128000,
+            "output": 16384
+          }
+        },
+        "gpt-5-mini": {
+          "name": "GPT-5 Mini",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "gpt-5-nano": {
+          "name": "GPT-5 Nano",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "gpt-4.1": {
+          "name": "GPT-4.1",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
         "gpt-4o": {
           "name": "GPT-4o",
           "limit": {
@@ -15,28 +51,24 @@
             "output": 8192
           }
         },
-        "gpt-4o-mini": {
-          "name": "GPT-4o Mini",
+        "gpt-oss-120b": {
+          "name": "GPT OSS 120B",
           "limit": {
             "context": 128000,
             "output": 8192
           }
-        },
-        "claude-4-5-sonnet": {
-          "name": "Claude 4.5 Sonnet",
-          "limit": {
-            "context": 200000,
-            "output": 65536
-          }
-        },
-        "o3": {
-          "name": "o3",
-          "limit": {
-            "context": 200000,
-            "output": 100000
-          }
         }
-      }
+      },
+      "exclude": [
+        "claude-sonnet-4.5",
+        "claude-haiku-4.5",
+        "o3",
+        "o3-mini",
+        "o1",
+        "llama-3.3-70b",
+        "mistral-large",
+        "gpt-4.1-mini"
+      ]
     }
   },
   "server": {

@@ -83,44 +83,36 @@
     border-top: 1px solid var(--border);
 }
 
-/* Criteria editor */
-.criteria-header {
+/* Assignment setup sections */
+.assignment-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+.assignment-section:last-of-type {
+    border-bottom: none;
+}
+
+.section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    margin-top: 20px;
-}
-.criteria-header h3 { font-size: 16px; }
-
-.criterion-row {
-    padding: 16px;
-    margin-bottom: 12px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    margin-bottom: 8px;
 }
 
-.criterion-fields { display: flex; flex-direction: column; gap: 8px; }
-
-.criterion-name {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+.section-label {
     font-size: 14px;
-    font-weight: 500;
-    background: var(--bg-secondary);
+    font-weight: 600;
     color: var(--text-primary);
-    font-family: inherit;
-}
-.criterion-name:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(188, 0, 49, 0.1);
 }
 
-.criterion-desc {
+.section-optional {
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.section-textarea {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid var(--border);
@@ -130,48 +122,111 @@
     background: var(--bg-secondary);
     color: var(--text-primary);
     font-family: inherit;
+    box-sizing: border-box;
 }
-.criterion-desc:focus {
+.section-textarea:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(188, 0, 49, 0.1);
 }
 
-.criterion-points-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.criterion-points-row label {
+/* File upload trigger */
+.file-input-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
     margin-bottom: 0;
-    font-size: 13px;
 }
 
-.criterion-points {
-    width: 80px;
-    padding: 6px 8px;
+.hidden-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+}
+
+/* File badge (shown after upload, replaces textarea) */
+.file-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.file-badge-icon {
+    font-size: 18px;
+    color: var(--accent);
+}
+
+.file-badge-name {
+    flex: 1;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-clear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius);
+}
+.file-clear-btn:hover { color: var(--danger); background: var(--bg-primary); }
+.file-clear-btn .material-symbols-outlined { font-size: 18px; }
+
+/* Submission panel */
+.submission-input-group {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.submission-input-group label {
+    margin-bottom: 10px;
+}
+
+.submission-input-group input[type="text"] {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    margin-top: 4px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-size: 14px;
     background: var(--bg-secondary);
     color: var(--text-primary);
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.submission-input-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(188, 0, 49, 0.1);
 }
 
-/* Submission panel */
-.submission-input-group {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+.submission-file-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    cursor: pointer;
 }
 
-.submission-upload {
-    margin-bottom: 20px;
-}
-.submission-upload input[type="file"] {
-    margin-top: 6px;
+.sub-file-name {
     font-size: 13px;
+    color: var(--text-muted);
 }
 
 .submission-row {
@@ -191,7 +246,13 @@
     min-width: 120px;
 }
 
-.submission-preview {
+.submission-studentid {
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 80px;
+}
+
+.submission-filename {
     flex: 1;
     font-size: 12px;
     color: var(--text-muted);
@@ -224,6 +285,12 @@
 }
 
 .result-name { font-weight: 600; font-size: 15px; }
+
+.result-studentid {
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--text-muted);
+}
 
 .result-score {
     font-weight: 700;
@@ -288,4 +355,5 @@
     .step-label { display: none; }
     .grading-form { padding: 0 16px 16px; }
     .submission-name { min-width: 80px; }
+    .submission-studentid { min-width: 60px; }
 }

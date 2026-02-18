@@ -6,6 +6,32 @@
 #include <json-c/json.h>
 
 /*
+ * Generate a UUID v4 string into buf (must be >= 37 bytes).
+ * The UvA server requires UUID-format IDs for both thread and message IDs.
+ */
+static void gen_uuid(char *buf)
+{
+    static const char hex[] = "0123456789abcdef";
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    srand((unsigned)ts.tv_nsec ^ (unsigned)ts.tv_sec ^ (unsigned)(uintptr_t)buf);
+
+    int pos = 0;
+    for (int i = 0; i < 8; i++)  buf[pos++] = hex[rand() & 0xf];
+    buf[pos++] = '-';
+    for (int i = 0; i < 4; i++)  buf[pos++] = hex[rand() & 0xf];
+    buf[pos++] = '-';
+    buf[pos++] = '4';
+    for (int i = 0; i < 3; i++)  buf[pos++] = hex[rand() & 0xf];
+    buf[pos++] = '-';
+    buf[pos++] = hex[8 + (rand() & 0x3)];
+    for (int i = 0; i < 3; i++)  buf[pos++] = hex[rand() & 0xf];
+    buf[pos++] = '-';
+    for (int i = 0; i < 12; i++) buf[pos++] = hex[rand() & 0xf];
+    buf[pos] = '\0';
+}
+
+/*
  * Translate OpenAI chat completion request -> UvA request body.
  *
  * OpenAI format:
@@ -53,10 +79,8 @@ char *translate_request(const char *openai_body, const char *thread_id)
 
     struct json_object *uva = json_object_new_object();
 
-    /* id + chatId */
+    /* id - the chat/thread ID */
     json_object_object_add(uva, "id", json_object_new_string(thread_id));
-    json_object_object_add(uva, "chatId",
-        json_object_new_string(thread_id));
 
     /* Model for overrides */
     const char *model = "gpt-4.1";
@@ -65,16 +89,21 @@ char *translate_request(const char *openai_body, const char *thread_id)
         model = json_object_get_string(model_obj);
     const char *uva_model = models_to_uva(model);
 
-    /* Convert OpenAI messages to UvA format with parts */
+    /*
+     * The UvA frontend sends only the last message as "message" (not
+     * the full history). Build the last message object with parts.
+     * Message IDs must be UUID format or UvA returns HTTP 500.
+     */
     struct json_object *msgs;
-    struct json_object *uva_msgs = json_object_new_array();
     struct json_object *last_msg = NULL;
-    const char *last_msg_id = "msg-proxy-001";
+    char last_msg_id[37];
+    gen_uuid(last_msg_id);
 
     if (json_object_object_get_ex(req, "messages", &msgs)) {
         int len = (int)json_object_array_length(msgs);
-        for (int i = 0; i < len; i++) {
-            struct json_object *m = json_object_array_get_idx(msgs, i);
+        if (len > 0) {
+            struct json_object *m = json_object_array_get_idx(msgs,
+                                                               (size_t)(len - 1));
             struct json_object *role_o, *content_o;
             const char *r = "user", *c = "";
             if (json_object_object_get_ex(m, "role", &role_o))
@@ -82,30 +111,17 @@ char *translate_request(const char *openai_body, const char *thread_id)
             if (json_object_object_get_ex(m, "content", &content_o))
                 c = json_object_get_string(content_o);
 
-            char mid[32];
-            snprintf(mid, sizeof(mid), "msg-proxy-%03d", i + 1);
-            struct json_object *um = make_uva_message(r, c, mid);
-            json_object_array_add(uva_msgs, um);
-
-            if (i == len - 1) {
-                last_msg = make_uva_message(r, c, mid);
-                last_msg_id = strdup(mid);
-            }
+            last_msg = make_uva_message(r, c, last_msg_id);
         }
     }
 
-    json_object_object_add(uva, "messages", uva_msgs);
     if (last_msg)
         json_object_object_add(uva, "message", last_msg);
 
-    /* messageId + trigger */
-    json_object_object_add(uva, "messageId",
-        json_object_new_string(last_msg_id));
-    json_object_object_add(uva, "trigger",
-        json_object_new_string("submit-message"));
-
-    /* flags */
+    /* flags - matches UvA frontend prepareSendMessagesRequest */
     struct json_object *flags = json_object_new_object();
+    json_object_object_add(flags, "studyMode",
+        json_object_new_boolean(0));
     json_object_object_add(flags, "enforceInternetSearch",
         json_object_new_boolean(0));
     json_object_object_add(flags, "enforceArtifactCreation",
@@ -117,7 +133,7 @@ char *translate_request(const char *openai_body, const char *thread_id)
     json_object_object_add(flags, "continue",
         json_object_new_boolean(0));
     json_object_object_add(flags, "isNewChat",
-        json_object_new_boolean(0));
+        json_object_new_boolean(1));
     json_object_object_add(uva, "flags", flags);
 
     /* overrides */
@@ -137,15 +153,6 @@ char *translate_request(const char *openai_body, const char *thread_id)
             json_object_get(param));
     if (json_object_object_get_ex(req, "max_tokens", &param))
         json_object_object_add(overrides, "maxTokens",
-            json_object_get(param));
-    if (json_object_object_get_ex(req, "frequency_penalty", &param))
-        json_object_object_add(overrides, "frequencyPenalty",
-            json_object_get(param));
-    if (json_object_object_get_ex(req, "presence_penalty", &param))
-        json_object_object_add(overrides, "presencePenalty",
-            json_object_get(param));
-    if (json_object_object_get_ex(req, "reasoning_effort", &param))
-        json_object_object_add(overrides, "reasoningEffort",
             json_object_get(param));
 
     json_object_object_add(uva, "overrides", overrides);

@@ -4,11 +4,9 @@ var Dashboard = Dashboard || {};
 Dashboard.grading = (function() {
     var state = {
         step: 1,
-        rubric: {
-            model: 'claude-sonnet-4.5',
-            criteria: [],
-            totalPoints: 0
-        },
+        assignment:    { text: '', fileName: '' },
+        rubric:        { text: '', fileName: '' },
+        exampleAnswer: { text: '', fileName: '' },
         submissions: [],
         nextSubmissionId: 1
     };
@@ -28,22 +26,17 @@ Dashboard.grading = (function() {
     }
 
     function buildAll() {
-        Dashboard.gradingUI.buildRubricEditor('grading-panel-1', state);
+        Dashboard.gradingUI.buildAssignmentPanel('grading-panel-1', state);
         Dashboard.gradingUI.buildSubmissionPanel('grading-panel-2', state);
         Dashboard.gradingUI.buildResultsPanel('grading-panel-3', state);
     }
 
     function setStep(n) {
-        if (n === 2) {
-            /* Recalculate total points before leaving rubric */
-            recalcTotalPoints();
-        }
         state.step = n;
         showStep(n);
 
-        /* Rebuild panel content when entering it */
         if (n === 1) {
-            Dashboard.gradingUI.buildRubricEditor('grading-panel-1', state);
+            Dashboard.gradingUI.buildAssignmentPanel('grading-panel-1', state);
         } else if (n === 2) {
             Dashboard.gradingUI.buildSubmissionPanel('grading-panel-2', state);
         } else if (n === 3) {
@@ -74,40 +67,56 @@ Dashboard.grading = (function() {
         }
     }
 
-    function recalcTotalPoints() {
-        var total = 0;
-        for (var i = 0; i < state.rubric.criteria.length; i++) {
-            total += state.rubric.criteria[i].maxPoints;
-        }
-        state.rubric.totalPoints = total;
+    /* Assignment/rubric/example text setters */
+    function setAssignmentText(text) {
+        state.assignment.text = text;
     }
 
-    /* Criterion operations */
-    function addCriterion() {
-        state.rubric.criteria.push({
-            name: '',
-            description: '',
-            maxPoints: 10
-        });
-        Dashboard.gradingUI.renderCriteria(state);
+    function setAssignmentFile(fileName, text) {
+        state.assignment.fileName = fileName;
+        state.assignment.text = text;
     }
 
-    function removeCriterion(idx) {
-        state.rubric.criteria.splice(idx, 1);
-        Dashboard.gradingUI.renderCriteria(state);
+    function clearAssignmentFile() {
+        state.assignment.fileName = '';
+        state.assignment.text = '';
     }
 
-    function updateCriterion(idx, field, value) {
-        if (state.rubric.criteria[idx]) {
-            state.rubric.criteria[idx][field] = value;
-        }
+    function setRubricText(text) {
+        state.rubric.text = text;
+    }
+
+    function setRubricFile(fileName, text) {
+        state.rubric.fileName = fileName;
+        state.rubric.text = text;
+    }
+
+    function clearRubricFile() {
+        state.rubric.fileName = '';
+        state.rubric.text = '';
+    }
+
+    function setExampleText(text) {
+        state.exampleAnswer.text = text;
+    }
+
+    function setExampleFile(fileName, text) {
+        state.exampleAnswer.fileName = fileName;
+        state.exampleAnswer.text = text;
+    }
+
+    function clearExampleFile() {
+        state.exampleAnswer.fileName = '';
+        state.exampleAnswer.text = '';
     }
 
     /* Submission operations */
-    function addSubmission(name, content) {
+    function addSubmission(name, studentId, fileName, content) {
         state.submissions.push({
             id: state.nextSubmissionId++,
             name: name,
+            studentId: studentId,
+            fileName: fileName,
             content: content,
             status: 'pending',
             result: null,
@@ -127,7 +136,6 @@ Dashboard.grading = (function() {
     function gradeAll() {
         setStep(3);
 
-        /* Reset statuses for pending/error submissions */
         for (var i = 0; i < state.submissions.length; i++) {
             if (state.submissions[i].status !== 'done') {
                 state.submissions[i].status = 'grading';
@@ -138,12 +146,10 @@ Dashboard.grading = (function() {
 
         Dashboard.gradingUI.renderResults(state);
 
-        /* Fire off grading for each non-done submission */
-        recalcTotalPoints();
         for (var j = 0; j < state.submissions.length; j++) {
             if (state.submissions[j].status === 'grading') {
                 Dashboard.gradingAPI.grade(
-                    state.rubric,
+                    state,
                     state.submissions[j],
                     onGradeResult,
                     onGradeError
@@ -175,8 +181,7 @@ Dashboard.grading = (function() {
         sub.result = null;
         sub.error = null;
         Dashboard.gradingUI.renderResults(state);
-        recalcTotalPoints();
-        Dashboard.gradingAPI.grade(state.rubric, sub, onGradeResult, onGradeError);
+        Dashboard.gradingAPI.grade(state, sub, onGradeResult, onGradeError);
     }
 
     function findSubmission(id) {
@@ -194,9 +199,15 @@ Dashboard.grading = (function() {
         mount: mount,
         unmount: unmount,
         setStep: setStep,
-        addCriterion: addCriterion,
-        removeCriterion: removeCriterion,
-        updateCriterion: updateCriterion,
+        setAssignmentText: setAssignmentText,
+        setAssignmentFile: setAssignmentFile,
+        clearAssignmentFile: clearAssignmentFile,
+        setRubricText: setRubricText,
+        setRubricFile: setRubricFile,
+        clearRubricFile: clearRubricFile,
+        setExampleText: setExampleText,
+        setExampleFile: setExampleFile,
+        clearExampleFile: clearExampleFile,
         addSubmission: addSubmission,
         removeSubmission: removeSubmission,
         gradeAll: gradeAll,

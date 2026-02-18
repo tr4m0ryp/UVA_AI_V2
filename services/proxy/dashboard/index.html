@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
     <link rel="stylesheet" href="/dashboard/css/style.css">
     <link rel="stylesheet" href="/dashboard/css/auth.css">
     <link rel="stylesheet" href="/dashboard/css/sidebar.css">
@@ -31,7 +32,7 @@
     <!-- App shell -->
     <div id="app-shell" class="app-shell hidden">
         <!-- Mobile toggle -->
-        <button id="mobile-sidebar-toggle" class="mobile-toggle">&#9776;</button>
+        <button id="mobile-sidebar-toggle" class="mobile-toggle"><span class="material-symbols-outlined">menu</span></button>
 
         <!-- Sidebar backdrop (mobile) -->
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
@@ -41,29 +42,33 @@
             <div class="sidebar-header">
                 <img src="/dashboard/img/uva-logo.svg" alt="UvA" class="sidebar-logo">
                 <span class="sidebar-title">UvA Proxy</span>
-                <button id="sidebar-toggle" class="sidebar-toggle">&#9776;</button>
+                <button id="sidebar-toggle" class="sidebar-toggle"><span class="material-symbols-outlined">menu</span></button>
             </div>
             <nav class="sidebar-nav">
                 <div class="sidebar-section">Navigation</div>
                 <div class="sidebar-item active" data-view="overview">
-                    <span class="sidebar-icon">&#9632;</span>
+                    <span class="sidebar-icon material-symbols-outlined">grid_view</span>
                     <span class="sidebar-label">Overview</span>
                 </div>
                 <div class="sidebar-item" data-view="chat">
-                    <span class="sidebar-icon">&#9993;</span>
+                    <span class="sidebar-icon material-symbols-outlined">chat</span>
                     <span class="sidebar-label">Chat Interface</span>
                 </div>
+                <div class="sidebar-item disabled" data-view="learning">
+                    <span class="sidebar-icon material-symbols-outlined">auto_stories</span>
+                    <span class="sidebar-label">Learning Space</span>
+                </div>
                 <div class="sidebar-item" data-view="keys">
-                    <span class="sidebar-icon">&#9919;</span>
+                    <span class="sidebar-icon material-symbols-outlined">key</span>
                     <span class="sidebar-label">API Keys</span>
                 </div>
                 <div class="sidebar-section">Tools</div>
                 <div class="sidebar-item" data-view="grading">
-                    <span class="sidebar-icon">&#9998;</span>
+                    <span class="sidebar-icon material-symbols-outlined">grading</span>
                     <span class="sidebar-label">Automated Grading</span>
                 </div>
                 <div class="sidebar-item" data-view="coding">
-                    <span class="sidebar-icon">&#10094;/&#10095;</span>
+                    <span class="sidebar-icon material-symbols-outlined">terminal</span>
                     <span class="sidebar-label">Cloud Coding</span>
                 </div>
             </nav>
@@ -105,7 +110,7 @@
                 <div class="grading-steps" id="grading-steps">
                     <div class="step active" data-step="1">
                         <span class="step-number">1</span>
-                        <span class="step-label">Rubric</span>
+                        <span class="step-label">Setup</span>
                     </div>
                     <div class="step-line"></div>
                     <div class="step" data-step="2">
@@ -123,14 +128,9 @@
                 <div id="grading-panel-3" class="grading-panel hidden"></div>
             </div>
 
-            <!-- Chat view (placeholder) -->
-            <div id="view-chat" class="view hidden">
-                <div class="view-header">
-                    <h2>Chat Interface</h2>
-                </div>
-                <div class="empty-state">
-                    <p>Chat interface is under development.</p>
-                </div>
+            <!-- Chat view -->
+            <div id="view-chat" class="view view-chat hidden">
+                <iframe id="chat-iframe" class="chat-iframe" frameborder="0" allowfullscreen></iframe>
             </div>
 
             <!-- Cloud Coding view (placeholder) -->

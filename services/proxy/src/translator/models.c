@@ -11,34 +11,22 @@
  * UvA uses the model IDs directly (e.g. "claude-sonnet-4.5").
  * We expose the same IDs plus common aliases.
  */
+/*
+ * Models confirmed available on aichat.uva.nl as of 2026-02-18.
+ * Verified via fetchAvailableModelsAction + end-to-end chat tests.
+ * Claude, Llama, o3/o1, mistral-large (UvA provider down), and older GPT
+ * variants have been removed.  Only models that return valid responses
+ * are listed here.
+ */
 static const model_mapping_t g_models[] = {
-    /* Anthropic */
-    {"claude-sonnet-4.5",   "claude-sonnet-4.5",   "Claude Sonnet 4.5"},
-    {"claude-haiku-4.5",    "claude-haiku-4.5",     "Claude Haiku 4.5"},
     /* OpenAI GPT-5 family */
-    {"gpt-5.2",             "gpt-5.2",             "GPT-5.2"},
-    {"gpt-5.1",             "gpt-5.1",             "GPT-5.1"},
     {"gpt-5",               "gpt-5",               "GPT-5"},
+    {"gpt-5.1",             "gpt-5.1",             "GPT-5.1"},
     {"gpt-5-mini",          "gpt-5-mini",          "GPT-5 Mini"},
     {"gpt-5-nano",          "gpt-5-nano",          "GPT-5 Nano"},
     /* OpenAI GPT-4 family */
     {"gpt-4.1",             "gpt-4.1",             "GPT-4.1"},
-    {"gpt-4.1-mini",        "gpt-4.1-mini",        "GPT-4.1 Mini"},
     {"gpt-4o",              "gpt-4o",              "GPT-4o"},
-    {"gpt-4",               "gpt-4",               "GPT-4"},
-    /* OpenAI reasoning */
-    {"o3",                  "o3",                  "o3"},
-    {"o3-mini",             "o3-mini",             "o3-mini"},
-    {"o1",                  "o1",                  "o1"},
-    /* Meta Llama */
-    {"llama-3.3-70b",       "Llama-3.3-70B",       "Llama 3.3 70B"},
-    {"llama-3.1-70b",       "Llama-3.1-70b",       "Llama 3.1 70B"},
-    {"llama-3.1-8b",        "Llama-3.1-8b",        "Llama 3.1 8B"},
-    {"llama-3-8b",          "Llama-3-8b",          "Llama 3 8B"},
-    /* Mistral */
-    {"mistral-large",       "mistral-large",       "Mistral Large"},
-    {"mistral-small-2503",  "mistral-small-2503",  "Mistral Small 2503"},
-    {"mistral-small-3.2",   "mistral-small-3.2",   "Mistral Small 3.2"},
     /* Open source */
     {"gpt-oss-120b",        "gpt-oss-120b",        "GPT-OSS 120B"},
 };

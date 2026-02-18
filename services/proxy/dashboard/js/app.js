@@ -27,7 +27,10 @@ Dashboard.app = (function() {
         });
         Dashboard.router.register('chat', {
             mount: function() {
-                window.location.href = 'http://127.0.0.1:5173';
+                var frame = document.getElementById('chat-iframe');
+                if (frame && !frame.src) {
+                    frame.src = 'http://127.0.0.1:5173';
+                }
             }
         });
         Dashboard.router.register('coding', {
