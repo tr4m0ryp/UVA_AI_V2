@@ -1,0 +1,39 @@
+# ─── Node / npm ───────────────────────────────────────────────────────────────
+node_modules/
+package-lock.json
+*.tsbuildinfo
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ─── C build artifacts ────────────────────────────────────────────────────────
+proxy/build/
+proxy/uva-proxy
+
+# ─── Databases ────────────────────────────────────────────────────────────────
+proxy/proxy.db
+proxy/proxy.db-shm
+proxy/proxy.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# ─── Secrets / environment files ──────────────────────────────────────────────
+proxy/proxy.env
+*.env
+.env
+.env.*
+!.env.example
+
+# ─── Captured traffic (potentially sensitive) ─────────────────────────────────
+proxy/captured_traffic.json
+
+# ─── OS / editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
