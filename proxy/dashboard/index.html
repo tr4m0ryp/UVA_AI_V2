@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UvA Proxy Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/dashboard/css/style.css">
+    <link rel="stylesheet" href="/dashboard/css/auth.css">
+    <link rel="stylesheet" href="/dashboard/css/sidebar.css">
+    <link rel="stylesheet" href="/dashboard/css/grading.css">
+</head>
+<body>
+    <!-- Login page -->
+    <div id="page-login" class="page hidden">
+        <div class="login-card">
+            <h1>UvA Proxy Dashboard</h1>
+            <p class="subtitle">Manage your API keys</p>
+            <button id="btn-browser-login" class="btn-browser">Login with UvA Account</button>
+            <div id="browser-login-status" class="hidden">
+                <span class="spinner"></span>
+                <span id="browser-status-text">Waiting for login...</span>
+            </div>
+            <p class="login-hint">You will be redirected to aichat.uva.nl to log in</p>
+            <div id="login-error" class="error-msg hidden"></div>
+        </div>
+    </div>
+
+    <!-- App shell -->
+    <div id="app-shell" class="app-shell hidden">
+        <!-- Mobile toggle -->
+        <button id="mobile-sidebar-toggle" class="mobile-toggle">&#9776;</button>
+
+        <!-- Sidebar backdrop (mobile) -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <img src="/dashboard/img/uva-logo.svg" alt="UvA" class="sidebar-logo">
+                <span class="sidebar-title">UvA Proxy</span>
+                <button id="sidebar-toggle" class="sidebar-toggle">&#9776;</button>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">Navigation</div>
+                <div class="sidebar-item active" data-view="overview">
+                    <span class="sidebar-icon">&#9632;</span>
+                    <span class="sidebar-label">Overview</span>
+                </div>
+                <div class="sidebar-item" data-view="chat">
+                    <span class="sidebar-icon">&#9993;</span>
+                    <span class="sidebar-label">Chat Interface</span>
+                </div>
+                <div class="sidebar-item" data-view="keys">
+                    <span class="sidebar-icon">&#9919;</span>
+                    <span class="sidebar-label">API Keys</span>
+                </div>
+                <div class="sidebar-section">Tools</div>
+                <div class="sidebar-item" data-view="grading">
+                    <span class="sidebar-icon">&#9998;</span>
+                    <span class="sidebar-label">Automated Grading</span>
+                </div>
+                <div class="sidebar-item" data-view="coding">
+                    <span class="sidebar-icon">&#10094;/&#10095;</span>
+                    <span class="sidebar-label">Cloud Coding</span>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-user-info">
+                    <div id="sidebar-user" class="sidebar-user"></div>
+                </div>
+                <button id="btn-logout" class="btn btn-sm">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <div class="main-content" id="main-content">
+            <!-- Overview view -->
+            <div id="view-overview" class="view hidden">
+                <div class="view-header">
+                    <h2>Overview</h2>
+                </div>
+                <div id="overview-grid" class="overview-grid"></div>
+            </div>
+
+            <!-- API Keys view -->
+            <div id="view-keys" class="view hidden">
+                <div class="view-header">
+                    <h2>API Keys</h2>
+                    <button id="btn-create-key" class="btn btn-primary">Create Key</button>
+                </div>
+                <div id="keys-grid" class="keys-grid"></div>
+                <div id="keys-empty" class="empty-state hidden">
+                    <p>No API keys yet. Create one to get started.</p>
+                </div>
+            </div>
+
+            <!-- Grading view -->
+            <div id="view-grading" class="view hidden">
+                <div class="view-header">
+                    <h2>Automated Grading</h2>
+                </div>
+                <div class="grading-steps" id="grading-steps">
+                    <div class="step active" data-step="1">
+                        <span class="step-number">1</span>
+                        <span class="step-label">Rubric</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="2">
+                        <span class="step-number">2</span>
+                        <span class="step-label">Submissions</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" data-step="3">
+                        <span class="step-number">3</span>
+                        <span class="step-label">Results</span>
+                    </div>
+                </div>
+                <div id="grading-panel-1" class="grading-panel"></div>
+                <div id="grading-panel-2" class="grading-panel hidden"></div>
+                <div id="grading-panel-3" class="grading-panel hidden"></div>
+            </div>
+
+            <!-- Chat view (placeholder) -->
+            <div id="view-chat" class="view hidden">
+                <div class="view-header">
+                    <h2>Chat Interface</h2>
+                </div>
+                <div class="empty-state">
+                    <p>Chat interface is under development.</p>
+                </div>
+            </div>
+
+            <!-- Cloud Coding view (placeholder) -->
+            <div id="view-coding" class="view hidden">
+                <div class="view-header">
+                    <h2>Cloud Coding</h2>
+                </div>
+                <div class="empty-state">
+                    <p>Cloud coding environment is under development.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Key Modal -->
+    <div id="modal-key" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-key-title">Create API Key</h3>
+                <button class="modal-close" id="modal-key-close">&times;</button>
+            </div>
+            <form id="form-key">
+                <label>Name (optional)
+                    <input type="text" id="key-name" placeholder="My key">
+                </label>
+                <label>Model
+                    <select id="key-model"></select>
+                </label>
+                <label>Temperature: <span id="val-temp">0.5</span>
+                    <input type="range" id="key-temp" min="0" max="2" step="0.1" value="0.5">
+                </label>
+                <label>Top P: <span id="val-topp">0.5</span>
+                    <input type="range" id="key-topp" min="0" max="1" step="0.05" value="0.5">
+                </label>
+                <label>Max Tokens
+                    <input type="number" id="key-maxtokens" value="4096" min="1" max="128000">
+                </label>
+                <label>Frequency Penalty: <span id="val-freq">0.0</span>
+                    <input type="range" id="key-freq" min="-2" max="2" step="0.1" value="0">
+                </label>
+                <label>Presence Penalty: <span id="val-pres">0.0</span>
+                    <input type="range" id="key-pres" min="-2" max="2" step="0.1" value="0">
+                </label>
+                <label>Reasoning Effort
+                    <select id="key-reasoning">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </label>
+                <label>System Prompt (optional)
+                    <textarea id="key-sysprompt" rows="3" placeholder="Custom instructions..."></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn" id="modal-key-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="modal-key-submit">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Key Created Modal -->
+    <div id="modal-created" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>API Key Created</h3>
+                <button class="modal-close" id="modal-created-close">&times;</button>
+            </div>
+            <p>Copy this key now. You will not be able to see it again.</p>
+            <div class="key-display">
+                <code id="created-key-value"></code>
+                <button class="btn btn-sm" id="btn-copy-key">Copy</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="modal-created-done">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/dashboard/js/api.js"></script>
+    <script src="/dashboard/js/auth.js"></script>
+    <script src="/dashboard/js/models.js"></script>
+    <script src="/dashboard/js/router.js"></script>
+    <script src="/dashboard/js/sidebar.js"></script>
+    <script src="/dashboard/js/overview.js"></script>
+    <script src="/dashboard/js/keys.js"></script>
+    <script src="/dashboard/js/grading-api.js"></script>
+    <script src="/dashboard/js/grading-ui.js"></script>
+    <script src="/dashboard/js/grading.js"></script>
+    <script src="/dashboard/js/app.js"></script>
+</body>
+</html>

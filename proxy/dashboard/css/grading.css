@@ -1,0 +1,291 @@
+/* Grading step indicator */
+.grading-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 16px 24px 24px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    border: 2px solid var(--border);
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.step-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.step.active .step-number {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+}
+.step.active .step-label { color: var(--accent); font-weight: 600; }
+
+.step.completed .step-number {
+    background: var(--success);
+    color: #ffffff;
+    border-color: var(--success);
+}
+.step.completed .step-label { color: var(--text-secondary); }
+
+.step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    margin: 0 12px;
+    min-width: 24px;
+}
+
+/* Grading form container */
+.grading-form {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 24px 24px;
+}
+
+.grading-form label {
+    display: block;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.grading-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+/* Criteria editor */
+.criteria-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    margin-top: 20px;
+}
+.criteria-header h3 { font-size: 16px; }
+
+.criterion-row {
+    padding: 16px;
+    margin-bottom: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.criterion-fields { display: flex; flex-direction: column; gap: 8px; }
+
+.criterion-name {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+.criterion-name:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(188, 0, 49, 0.1);
+}
+
+.criterion-desc {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    resize: vertical;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+.criterion-desc:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(188, 0, 49, 0.1);
+}
+
+.criterion-points-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.criterion-points-row label {
+    margin-bottom: 0;
+    font-size: 13px;
+}
+
+.criterion-points {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Submission panel */
+.submission-input-group {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.submission-upload {
+    margin-bottom: 20px;
+}
+.submission-upload input[type="file"] {
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.submission-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+}
+
+.submission-name {
+    font-weight: 500;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.submission-preview {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Results panel */
+.results-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.result-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.result-name { font-weight: 600; font-size: 15px; }
+
+.result-score {
+    font-weight: 700;
+    font-size: 15px;
+    padding: 2px 10px;
+    border-radius: 4px;
+}
+.score-good { background: #dcfce7; color: #166534; }
+.score-ok { background: #fef3c7; color: #92400e; }
+.score-bad { background: #fee2e2; color: #991b1b; }
+
+.result-status {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.result-header.result-error .result-status { color: var(--danger); }
+
+.result-feedback {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.result-error-msg {
+    font-size: 13px;
+    color: var(--danger);
+    margin-bottom: 8px;
+}
+
+.btn-retry { margin-bottom: 4px; }
+
+/* Criteria detail (expandable) */
+.criteria-detail {
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+.criteria-detail summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 8px;
+}
+
+.criteria-detail-row {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--bg-primary);
+}
+.criteria-detail-row:last-child { border-bottom: none; }
+
+.cd-name { font-weight: 500; font-size: 13px; display: inline-block; margin-right: 8px; }
+.cd-score { font-weight: 600; font-size: 13px; color: var(--accent); }
+.cd-feedback { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .grading-steps { padding: 12px 16px 16px; }
+    .step-label { display: none; }
+    .grading-form { padding: 0 16px 16px; }
+    .submission-name { min-width: 80px; }
+}

@@ -1,0 +1,50 @@
+{
+  "provider": {
+    "uva-proxy": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "UvA Proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787/v1",
+        "apiKey": "{env:UVA_PROXY_API_KEY}"
+      },
+      "models": {
+        "gpt-4o": {
+          "name": "GPT-4o",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "gpt-4o-mini": {
+          "name": "GPT-4o Mini",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "claude-4-5-sonnet": {
+          "name": "Claude 4.5 Sonnet",
+          "limit": {
+            "context": 200000,
+            "output": 65536
+          }
+        },
+        "o3": {
+          "name": "o3",
+          "limit": {
+            "context": 200000,
+            "output": 100000
+          }
+        }
+      }
+    }
+  },
+  "server": {
+    "port": 4096,
+    "hostname": "127.0.0.1",
+    "cors": [
+      "http://127.0.0.1:5174",
+      "http://localhost:5174"
+    ]
+  }
+}

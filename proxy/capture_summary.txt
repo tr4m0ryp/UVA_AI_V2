@@ -1,0 +1,8 @@
+UvA AI Chat Traffic Capture Summary
+============================================================
+
+Total captured: 0 requests
+Chat API calls: 0
+Server actions: 0
+Auth requests:  0
+

@@ -1,0 +1,724 @@
+================================================================================
+  UvA AI Chat (aichat.uva.nl) - Reverse Engineering Analysis
+  Generated: 2026-02-18
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Application Overview
+2. Infrastructure & Hosting
+3. Authentication System
+4. API Endpoints
+5. Next.js Server Actions
+6. AI Models & Configuration
+7. System Prompt (Complete)
+8. Application Features
+9. Client-Side Architecture
+10. Environment Variables
+11. Tool/Extension System
+12. Source Code Structure
+13. Security Observations
+
+
+================================================================================
+1. APPLICATION OVERVIEW
+================================================================================
+
+Name:           UvA AI Chat
+Organization:   University of Amsterdam (UvA)
+URL:            https://aichat.uva.nl
+IP Address:     135.225.26.30
+Framework:      Next.js (App Router with Turbopack)
+Build System:   Turbopack (not Webpack)
+TLS:            TLSv1.3 / TLS_AES_256_GCM_SHA384
+Certificate:    Sectigo Public Server Authentication CA OV R36
+                Subject: C=NL; ST=North-Holland; O=Universiteit van Amsterdam; CN=aichat.uva.nl
+                Valid: May 28, 2025 - May 28, 2026
+
+Multi-Tenant Platform:
+  - UvA (University of Amsterdam) -> "UvA AI Chat"
+  - HvA (Hogeschool van Amsterdam) -> "HvA AI Chat"
+  - Npuls -> "EduGenAI"
+  Tenant is selected via NEXT_PUBLIC_ORG environment variable (defaults to "UvA").
+
+Manifest:
+  Name: "UvA Chat - University of Amsterdam Chat Platform"
+  Short Name: "UvA Chat"
+  Categories: productivity, social, education
+  PWA: Yes (standalone, portrait-primary)
+
+
+================================================================================
+2. INFRASTRUCTURE & HOSTING
+================================================================================
+
+Server IP:       135.225.26.30
+Protocol:        HTTP/1.1 (no HTTP/2 despite ALPN offer)
+State Management: Valtio (proxy-based reactive state)
+i18n:            next-intl (IntlMessageFormat)
+UI Library:      Radix UI primitives + Tailwind CSS
+Fonts:           Playfair Display, Source Sans 3, Material Symbols Outlined
+Icons:           Material Symbols (Google Fonts CDN)
+
+Embedding Model:  text-embedding-ada-002 (Azure OpenAI)
+                  Referenced as AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME
+
+
+================================================================================
+3. AUTHENTICATION SYSTEM
+================================================================================
+
+Provider: NextAuth.js with Azure Active Directory (Azure AD) OAuth
+
+Endpoints (all confirmed working):
+  GET  /api/auth/providers   -> Returns provider config
+  GET  /api/auth/csrf        -> Returns CSRF token
+  GET  /api/auth/session     -> Returns session (empty {} when unauthenticated)
+  GET  /api/auth/signin      -> NextAuth sign-in page (HTTP 200)
+  GET  /api/auth/signout     -> NextAuth sign-out page (HTTP 200)
+  GET  /api/auth/error       -> NextAuth error page (HTTP 200)
+  GET  /api/auth/_log        -> HTTP 400 (exists but requires params)
+  POST /api/auth/callback/azure-ad -> HTTP 302 (redirect after OAuth)
+
+Provider Configuration (from /api/auth/providers):
+  {
+    "azure-ad": {
+      "id": "azure-ad",
+      "name": "Azure Active Directory",
+      "type": "oauth",
+      "signinUrl": "https://aichat.uva.nl/api/auth/signin/azure-ad",
+      "callbackUrl": "https://aichat.uva.nl/api/auth/callback/azure-ad"
+    }
+  }
+
+Azure AD OAuth2 Details (extracted from redirect chain):
+  Authorization endpoint: https://login.microsoftonline.com/a0f1cacd-618c-4403-b945-76fb3d6874e5/oauth2/v2.0/authorize
+  Azure AD Tenant ID:     a0f1cacd-618c-4403-b945-76fb3d6874e5
+  Client ID:              1622bd52-d3cf-4d8a-a853-41eeab1f1d93
+  Scopes:                 openid profile email
+  Response type:          code (Authorization Code flow)
+  Redirect URI:           https://aichat.uva.nl/api/auth/callback/azure-ad
+
+Login Flow:
+  1. User clicks "Login" button
+  2. Button calls signIn("azure-ad") from next-auth/react
+  3. POST to /api/auth/signin/azure-ad with CSRF token
+  4. Server sets state cookie + redirects to Microsoft login
+  5. User authenticates with UvA credentials at login.microsoftonline.com
+  6. Microsoft redirects back to /api/auth/callback/azure-ad with auth code
+  7. Server exchanges code for token, creates session
+  8. Settings loaded via GetUserSettings server action
+
+Dev Mode:
+  - When isDevMode is true, a second button appears: "Basic Auth (DEV ONLY)"
+  - This calls signIn("localdev") -- a local dev authentication provider
+
+Session Management:
+  - BroadcastChannel used for cross-tab session sync
+  - Periodic session refresh via polling (configurable interval)
+  - Unauthenticated users are redirected to "/" (login page)
+
+
+================================================================================
+4. API ENDPOINTS
+================================================================================
+
+Confirmed endpoints (non-404 responses):
+
+  POST /api/v1/chat         -> HTTP 400 (requires "id" field) or 500 (with id but no auth)
+  GET  /api/v1/chat          -> HTTP 405 (Method Not Allowed -- POST only)
+  GET  /api/chat             -> HTTP 307 (redirects to / when unauthenticated)
+  POST /api/chat             -> HTTP 307 (redirects to / when unauthenticated)
+  GET  /api/chat/completions -> HTTP 307 (redirects to / when unauthenticated)
+  POST /api/chat/completions -> HTTP 307 (redirects to / when unauthenticated)
+
+/api/v1/chat Request Validation:
+  POST with empty body returns:
+  {
+    "error": "Bad request",
+    "message": "[{\"expected\":\"string\",\"code\":\"invalid_type\",\"path\":[\"id\"],\"message\":\"Invalid input: expected string, received undefined\"}]"
+  }
+  This reveals Zod validation is used server-side.
+  The endpoint requires at minimum an "id" field (string type).
+  With just {"id":"test"} it returns HTTP 500 (likely auth failure internally).
+
+Endpoints that return 404 (do not exist as standalone routes):
+  /api/models, /api/conversations, /api/messages, /api/personas,
+  /api/prompts, /api/extensions, /api/projects, /api/groups,
+  /api/artifacts, /api/settings, /api/user, /api/users, /api/admin,
+  /api/stream, /api/upload, /api/files, /api/config, /api/trpc, /trpc,
+  /api/v1/chat/completions, /api/v1/models, /api/v1/extensions,
+  /api/v1/personas, /api/v1/prompts, /api/v1/conversations, /api/v1/messages
+
+Note: Most CRUD operations use Next.js Server Actions (React Server Components),
+NOT traditional REST API endpoints. See section 5.
+
+
+================================================================================
+5. NEXT.JS SERVER ACTIONS
+================================================================================
+
+The application uses Next.js App Router Server Actions for most data operations.
+These are invoked via callServer() with unique action IDs.
+
+Confirmed Server Actions (extracted from source maps and bundles):
+
+  Action ID                                        | Function Name
+  -------------------------------------------------|--------------------------------------------
+  7fa9c40dcccedd472c373512592839b199877fffaf        | RevalidateCache
+  7f9ab598aff0aaa36bb4b8080daee13e79772d36c2       | handleCreateMemory
+  7f11518888eef3f3adc0ac25ccd24756afb21393bc       | handleDeleteAllMemories
+  7fc9601bc4c180c403da30bae3cd0353f35bcefc1d       | handleDeleteMemory
+  7f1cc2f6d73ced099ec1e59e44223041ba5d69c105       | handleFindAllMemoriesForCurrentUser
+  7f358272f2eccc2cf70a9c0c8f9f84e3d62acb5dbc       | handleUpdateMemory
+  7f8a27aacb00e22b94966061e015172d6af5669132       | GetUserSettings
+  7fa78a78a87a43364cc2f3b127c9c182ee42ac5c5f       | SaveUserSetting
+
+Source file mapping:
+  - RevalidateCache -> apps/client/features/v1/lib/helpers/navigation-helpers.ts
+  - Memory actions  -> apps/client/features/v1/frontend/shared/user/memory/memory-entry.ts
+  - Settings actions -> apps/client/features/v1/frontend/shared/user/user-data.ts
+
+RevalidateCache accepts { type: "layout", page?: string } to trigger
+Next.js cache revalidation for specific pages/layouts.
+
+
+================================================================================
+6. AI MODELS & CONFIGURATION
+================================================================================
+
+Default Model:    gpt-5.1  (or gpt-4.1 when TESTING env var is set)
+Title Generation: gpt-4.1
+Memory Model:     gpt-4.1 (configurable via DEFAULT_MEMORY_MODEL env var)
+RAG Rewrite:      gpt-4.1
+
+Default Temperature: 0.5
+Default Top-P:       0.5
+Default Reasoning Effort: "medium"
+Max Tokens:          32384
+Max Chat History:    30 messages
+Max Image Uploads:   10
+
+Available Models (from i18n model descriptions):
+
+  OpenAI Models:
+    - gpt-5.2    : "Latest frontier model with advanced reasoning and adaptive thinking time"
+    - gpt-5.1    : "One of the latest frontier models. Excellent for coding, complex reasoning"
+    - gpt-5      : "Good for complex projects, strategic analyses, and high-quality creative work"
+    - gpt-5-mini : "Good with text, images, and audio combined with speed"
+    - gpt-5-nano : "Good for very light tasks such as summaries, quick calculations"
+    - gpt-4.1    : "Good with code, large documents, and deploying agents"
+    - gpt-4.1-mini: "Good for general tasks like summarization, drafting emails"
+    - gpt-4.1-nano: "Good for quick tasks such as short FAQs, simple instructions"
+    - gpt-4      : "Original GPT-4, strong general purpose model"
+    - gpt-4o     : "Good at complex reasoning and generating new, original content"
+    - gpt-4o-mini: "Faster & cheaper than GPT-4o, but slightly less accurate"
+    - o3         : "OpenAI's advanced reasoning model for complex problems"
+    - o1         : "OpenAI's reasoning model with step-by-step thinking"
+    - o3-mini    : "Good at reasoning, math, puzzles, step-by-step problem solving"
+
+  Anthropic Models:
+    - claude-sonnet-4.5 : "Most intelligent Claude model, good for complex tasks"
+    - claude-haiku-4.5  : "Fast and efficient Claude model, good for quick tasks"
+
+  Meta Llama Models:
+    - Llama-3.3-70B-Instruct     : "Good with complex texts, documents, reports"
+    - Llama-3.3-70b-Instruct-AWQ : "Good with complex texts (quantized)"
+    - Llama-3.1-70b-instruct     : "Good with complex texts, documents"
+    - Llama-3.1-8b-instruct      : "Good with basic content, short summaries"
+    - Llama-3-8b-instruct        : "Lightweight, fast inference, edge deployment"
+
+  Mistral Models:
+    - mistral-large        : "Good with multilingual content and documents"
+    - mistral-small-2503   : "Efficient, European AI, privacy-focused"
+    - mistral-small-3.2    : "Small, fast Mistral model for quick responses"
+
+  Open Source Composite:
+    - gpt-oss-120b         : "Powerful open-source model"
+
+Model Comparison Table (from Persona info i18n):
+  GPT-4.1          | General, language, agentic    | 14-04-2025 | High
+  GPT-4.1-nano     | Cost-effective, simple tasks  | 14-04-2025 | Low
+  o3-mini          | Reasoning, math, coding       | 31-01-2025 | Medium
+  GPT-4o           | Versatile, multimodal         | 20-11-2024 | High
+  GPT-4o-mini      | Cost-efficient, daily tasks   | 18-07-2024 | Low
+  Llama-3.3-70B    | Open source, long context     | 01-12-2023 | Medium
+  Llama-3-8B       | Lightweight, edge deployment  | 01-10-2023 | Low
+  Mistral-Small    | Efficient, European, privacy  | 01-10-2023 | Medium
+  Mistral-Large    | Complex, multilingual, code   | 01-12-2023 | High
+
+
+================================================================================
+7. SYSTEM PROMPT (COMPLETE)
+================================================================================
+
+The default system prompt is generated by CHAT_DEFAULT_SYSTEM_PROMPT(model):
+
+--- BEGIN SYSTEM PROMPT ---
+**BASE BEHAVIOR -- always active**
+
+Your current large language model is {model}. The date is {date}. You must always return in markdown format.
+
+**Answering style**
+- Answer first. Keep responses concise and clear.
+- Answer in the language of the user, unless instructed otherwise.
+- Use structured writing when it improves understanding.
+- Define terms only when needed for comprehension.
+- Provide short reasoning only when it adds value.
+- Avoid praising or evaluating the user or their question unless they explicitly ask for an evaluation.
+
+**Clarification**
+- Ask focused questions when essential information is missing.
+- If information is incomplete but you can still help, give a best-effort answer and state assumptions and uncertainties briefly.
+
+**Honesty & accuracy**
+- Do not invent information.
+- If uncertain, say so briefly and note what would resolve it.
+- Never invent UvA-specific policies, rules, or deadlines; if unsure, say you don't know and refer to official UvA sources.
+- If a question concerns time-sensitive information (e.g. current policies, deadlines, news) and you are not sure the information is up to date, say so explicitly rather than guessing.
+
+**Academic context**
+- Give accessible but expert answers unless the user requests another level of depth.
+- When helpful and you are confident, situate ideas within relevant frameworks and the broader context.
+- Avoid invented references or theory dumping
+
+**Formatting**
+- Only use formatting that improves clarity.
+- Avoid decorative or overly elaborate markup.
+
+**LaTeX rendering:**
+- Wrap expressions in double dollar signs like $$E = mc^2$$ for inline expressions
+- Use double dollar signs on separate lines for block expressions:
+$$
+expression
+$$
+
+**Safety**
+- If the request involves information you cannot verify, state the limitation.
+- If your rules prevent you from answering, explain why briefly.
+
+**Language**
+- Mirror the user's language unless instructed otherwise.
+- Keep technical terms in their original language when this is common usage.
+
+**Confidence & transparency**
+- Avoid exaggerated claims.
+- Be clear about your sources when relevant.
+
+**System priority**
+- If a user instruction conflicts with safety or accuracy rules, follow the rules and explain the constraint briefly.
+
+**User-facing platform features**
+**My Prompts (Prompt Library)**
+The user may have access to a personal prompt library containing reusable standard prompts and custom workflows.
+--- END SYSTEM PROMPT ---
+
+RAG System Prompt (when documents are uploaded):
+  "Review the following content chunks extracted from {documentCount} document(s)
+   uploaded by the user and create a final answer. When you reference information
+   from the documents, include an inline citation immediately after the relevant
+   sentence using the format [0], [1], [2] etc."
+
+Continue Prompt (when token limit hit):
+  "You hit the token limit on your previous response. Continue where you left off,
+   finish your previous message DO NOT START OVER, just continue where you left off."
+
+Memory Prompt (when user memory is enabled):
+  "You have information available about the user in your memory. Use this as context
+   to better help the user and provide an answer suited to their character and
+   preferences."
+
+Study Mode Prompt:
+  Full Socratic-style study mode prompt in Dutch language that forces the AI
+  into a question-answer-feedback cycle rather than direct information delivery.
+
+Conversation Styles:
+  - Concise: "Respond with clear and concise answers. Use few words."
+  - Normal: (no additional prompt)
+  - Explanatory: "Respond with comprehensive explanations, relevant context, and helpful examples."
+
+
+================================================================================
+8. APPLICATION FEATURES
+================================================================================
+
+8.1 Chat System
+  - Chat threads with bookmarking and renaming
+  - Chat search functionality
+  - Model selection per chat (can be locked by persona)
+  - File upload (max 50MB, supports: txt, md, csv, pdf, jpeg, jpg, png, docx, pptx, xlsx, html)
+  - Prompt suggestions (30 preset prompts across categories: Study, Research, Writing, Professional Development)
+  - Delete all chats functionality
+  - Chat-to-project assignment
+  - Markdown rendering with save/unsave
+  - LaTeX rendering (double dollar sign syntax)
+  - Stream-based responses
+
+8.2 Personas
+  - Custom AI assistant configurations
+  - Fields: title, description, model, conversation style (Creative/Balanced/Precise/Custom), behavior description
+  - File upload to enhance persona resources
+  - Standard personas (Course Manual Creator, Socratic Coach, Language Assistant)
+  - Standard persona IDs: Qffcg8Y813rlOm4QJdrtAdlBLJ6Tp68dcjH4, Yy5SsO0sxOe7bCWPCualvv6TkkYORshCziYL, 7AeFOEourhTgeXqyLS92jC4KD0oSSLMNYk2F, zPXT9stxo7OjM8etwf6BKLN87cd4WcYXY6fT
+  - Persona sharing (publish to organization)
+  - Quick persona access via "@" mention in chat
+  - Persona-specific chat threads
+  - Custom temperature and top-p settings
+
+8.3 Projects
+  - Digital containers for organizing chats, prompts, and personas
+  - Nested sub-projects
+  - Custom instructions per project (max 1500 chars)
+  - Color coding
+  - Move between projects
+  - Add chats, prompts, personas to projects
+
+8.4 Groups
+  - Multi-user collaboration
+  - Roles: Members and Owners
+  - Share personas and prompts within groups
+  - Start/end dates
+  - Option to hide members from each other
+  - Email-based member management
+
+8.5 Prompts (Prompt Library)
+  - Save and reuse custom prompts
+  - Standard prompts included (Academic Paper Feedback, MCQ Generator)
+  - Quick access via book icon in chat input
+  - Shareable via groups
+
+8.6 Extensions
+  - API-based tool extensions
+  - Support for GET, POST, PUT methods
+  - Custom headers (with Azure Key Vault support for secrets)
+  - Function definitions
+  - Built-in extensions: BingSearch, Azure AI Search
+
+8.7 Artifacts
+  - Separate UI panel for substantial content
+  - Code execution (Python, sandboxed)
+  - Image generation integration
+  - Markdown/HTML/React rendering
+  - Edit and iterate on artifacts
+
+8.8 Tools (AI Function Calling)
+  - create_image: Image generation
+  - internet_search_agent: Web search via Bing
+  - fetch_document: Full document retrieval (32000 token limit)
+  - create_artifact: Artifact creation/editing
+  - code_execution: Python code execution (sandboxed, via /mnt/data/)
+  - analyze_data_file: Pandas-based data analysis
+
+8.9 Memory System
+  - User memory storage (remembered context)
+  - CRUD operations via server actions
+  - Toggle memory context on/off
+  - Manual memory management
+
+8.10 Settings
+  - Theme (light/dark/system)
+  - Default model selection
+  - Prompt suggestions toggle
+  - Toast notifications toggle
+  - Memory context toggle
+  - Custom system instructions
+  - Conversation style (Concise/Normal/Explanatory)
+  - Artifacts toggle
+  - Auto-open artifacts toggle
+  - Code execution toggle
+  - Email notifications
+  - Speech enabled
+  - Language selection
+  - Delete all chats
+  - Delete account
+
+8.11 Documents
+  - File upload with status tracking (Uploading -> Processing -> Analysing -> Done)
+  - RAG (Retrieval Augmented Generation) with chunked document context
+  - Data file analysis integration
+  - Session-based file persistence (/mnt/data/)
+
+8.12 Study Mode
+  - Socratic coaching mode (Dutch language)
+  - Question-answer-feedback learning cycle
+  - Forces active learning instead of information dumping
+
+8.13 PWA Support
+  - Install as application
+  - Home screen shortcut
+
+
+================================================================================
+9. CLIENT-SIDE ARCHITECTURE
+================================================================================
+
+Project Structure (from source maps):
+  apps/client/
+    app/
+      client-providers.tsx         -- SessionProvider + SettingsProvider + ThemeProvider
+    features/v1/
+      frontend/
+        auth/
+          components/
+            login.tsx              -- Login component (Azure AD + localdev)
+        shared/
+          theme/
+            theme-config.ts        -- Multi-tenant config, system prompts, all constants
+            tenants/
+              UvA.json             -- UvA-specific theming
+              HvA.json             -- HvA-specific theming
+              Npuls.json           -- Npuls-specific theming
+          ui/
+            avatar.tsx
+            button.tsx
+            card.tsx
+            lib.ts
+            loading.tsx
+            mobile-guard.tsx       -- Blocks mobile access
+            page-loader.tsx
+            toast.tsx
+            toaster.tsx
+            use-toast.ts
+            hooks/
+              use-mobile-detection.ts
+          user/
+            models.ts              -- UserSettingKey enum
+            user-store.ts          -- Valtio state store for user/memory
+            user-data.ts           -- Server action wrappers (GetUserSettings, SaveUserSetting)
+            memory/
+              memory-entry.ts      -- Memory CRUD server action wrappers
+              models.ts            -- MemoryModel type
+            settings/
+              settings-provider.tsx -- React context for settings
+      lib/
+        helpers/
+          navigation-helpers.ts    -- RevalidateCache server action
+        utils/
+          valtio-hooks.ts          -- useSnapshot wrapper
+
+Key React Components:
+  LogIn              -> Login page with Azure AD button
+  ClientProviders    -> SessionProvider > SettingsProvider > ThemeProvider
+  MobileGuard        -> Blocks mobile devices (shows "not supported" message)
+  Toaster            -> Toast notification system
+  IconMark           -> Brand icon component
+  PageLoader         -> Loading spinner
+  SettingsProvider   -> User settings context provider
+
+State Management: Valtio (proxy-based)
+  - userStore: memory[], isMemoryToggled, isSettingsOpen, isMemoryManagerOpen,
+               isInstructionManagerOpen, settings Map
+
+Client-Side Routing:
+  / (root)        -> Login page (when unauthenticated) or Chat (when authenticated)
+
+Build ID: BwEcfu3ou1m3axXFedoUn
+
+
+================================================================================
+10. ENVIRONMENT VARIABLES
+================================================================================
+
+Referenced in client-side code:
+  NEXT_PUBLIC_ORG           -- Tenant selection: "UvA" | "HvA" | "Npuls"
+  NEXTAUTH_URL              -- NextAuth base URL
+  NEXTAUTH_URL_INTERNAL     -- Internal NextAuth URL
+  DEFAULT_LLM               -- Default language model (fallback: "gpt-5.1")
+  DEFAULT_MEMORY_MODEL      -- Model for memory operations (fallback: "gpt-4.1")
+  TESTING                   -- When set, uses "gpt-4.1" as default model
+
+
+================================================================================
+11. TOOL/EXTENSION SYSTEM
+================================================================================
+
+Built-in Tools:
+  1. create_image       -- "Create image" (DALL-E integration implied)
+  2. internet_search_agent -- "Search the internet" (Bing Search)
+  3. fetch_document     -- "Reading documents" (full doc retrieval, 32000 token limit)
+  4. create_artifact    -- Artifact creation/editing
+  5. code_execution     -- Python sandbox execution
+  6. analyze_data_file  -- Pandas-based data analysis
+
+Extension System:
+  Users can create custom API extensions with:
+  - Name, short description, detailed description
+  - Custom HTTP headers (Content-Type: application/json default)
+  - Azure Key Vault integration for secret header values
+  - Function definitions supporting GET, POST, PUT
+  - Follows OpenAI function calling specification
+
+Pre-built Extension Examples:
+  - "Internet Search": BingSearch function
+  - "Azure AI Search": Internal document search with citation format
+
+
+================================================================================
+12. SOURCE CODE STRUCTURE
+================================================================================
+
+The application follows a monorepo pattern:
+  apps/client/           -- Next.js frontend application
+    app/                 -- Next.js App Router pages
+    features/v1/         -- Feature modules (versioned)
+      frontend/          -- Client-side components and logic
+        auth/            -- Authentication components
+        shared/          -- Shared UI, theme, user management
+      lib/               -- Utilities and helpers
+
+Source Maps are PUBLICLY ACCESSIBLE at:
+  https://aichat.uva.nl/_next/static/chunks/{hash}.js.map
+
+This allows extraction of original TypeScript source code.
+
+JavaScript Bundles (with sizes):
+  1e95088adf2d5a66.js  -- 188,595 bytes (React/core framework)
+  a6dad97d9634a72d.js  -- 112,594 bytes (polyfills/core-js)
+  5c576285c95e8efb.js  -- 64,857 bytes (Next.js router)
+  cb3977dda22de1dc.js  -- 48,422 bytes (intl/i18n library)
+  b28f2841d84f1e0b.js  -- 42,480 bytes (React client runtime)
+  0a9a3b05a583136a.js  -- 41,995 bytes (NextAuth + app config)
+  4401e414b02c7ada.js  -- 41,706 bytes (RSC client)
+  55808bdd46da590f.js  -- 32,582 bytes (UI components)
+  06059fd9028ff61c.js  -- 26,416 bytes (app components + server actions)
+  c4b4cb5aa9fce2ad.js  -- 21,851 bytes (React shared)
+  cfb62509f6da598e.js  -- 11,364 bytes (login page)
+  8d9d5b8d8733dd37.js  -- 983 bytes (loading indicator)
+
+
+================================================================================
+13. SECURITY OBSERVATIONS
+================================================================================
+
+1. Source Maps Exposed:
+   All .js.map files are publicly accessible, revealing original TypeScript
+   source code, file structure, and internal comments.
+
+2. Server Action IDs Exposed:
+   All 8 server action IDs are visible in client bundles, though they require
+   authentication to invoke.
+
+3. API Input Validation:
+   /api/v1/chat uses Zod validation (good practice) but returns detailed
+   validation error messages including field names and expected types.
+
+4. No Rate Limiting Observed:
+   No X-RateLimit headers observed on API responses.
+
+5. Dev Mode Button:
+   Login component includes a "Basic Auth (DEV ONLY)" button controlled by
+   isDevMode prop. If accidentally enabled in production, this could bypass
+   Azure AD authentication.
+
+6. CSRF Protection:
+   NextAuth provides CSRF tokens via /api/auth/csrf endpoint.
+
+7. Session Cookies:
+   Session management handled by NextAuth with same-origin credentials.
+
+8. Standard Persona IDs:
+   Hard-coded persona IDs are exposed in the client bundle.
+
+9. Mobile Not Supported:
+   Application actively blocks mobile access with a "Mobile Not Supported Yet"
+   message, reducing attack surface from mobile browsers.
+
+
+================================================================================
+14. ADDITIONAL SERVER ACTIONS (Auth-Gated, from JS bundle analysis)
+================================================================================
+
+These server actions were found in JS bundles but their action IDs are
+only available in authenticated-page chunks (not in public source maps):
+
+Chat Operations (source: likely chat-data.ts or similar):
+  handleFindAllChatThreadsForCurrentUser
+  handleDeleteChatThread
+  handleUpdateChatTitle
+  handleUpsertChatThread
+
+Project Operations:
+  handleCreateProject
+  handleDeleteProject
+  handleUpdateProject
+  handleGetAllProjectsAndContents
+  handleCreateProjectChatThread
+  handleAddChatToProject
+  handleAddPersonaToProject
+  handleAddPromptToProject
+  handleRemoveFromProject
+  handleRemoveProjectFromParent
+
+Extension Operations:
+  handleFindAllExtensionsForCurrentUser
+  handleCreateExtension
+  handleDeleteExtension
+  handleUpdateExtension
+
+To extract these action IDs:
+  1. Authenticate via browser
+  2. Navigate to /chat, /personas, /extensions pages
+  3. Capture the JS chunks loaded on those pages
+  4. Source maps for those chunks will contain the action IDs
+
+
+================================================================================
+15. EXTRACTED SOURCE CODE
+================================================================================
+
+Original TypeScript source code was extracted from publicly accessible
+source maps and saved to:
+  /home/tr4m0ryp/Projects/reversed_uva_ai/extracted/apps/client/
+
+Key files extracted:
+  - features/v1/frontend/auth/components/login.tsx
+  - features/v1/frontend/shared/user/user-store.ts (Valtio state store)
+  - features/v1/frontend/shared/user/models.ts (UserSettingKey enum)
+  - features/v1/frontend/shared/user/settings/settings-provider.tsx
+  - features/v1/frontend/shared/theme/theme-config.ts (ALL constants, prompts, models)
+  - features/v1/frontend/shared/ui/*.tsx (UI components)
+  - features/v1/lib/utils/valtio-hooks.ts
+  - app/client-providers.tsx
+
+
+================================================================================
+16. RECOMMENDED NEXT STEPS
+================================================================================
+
+To continue reverse engineering for building a client:
+
+1. AUTHENTICATE in Firefox, then:
+   - Open DevTools (F12) -> Network tab
+   - Use the chat, create personas, etc.
+   - Export as HAR file for analysis
+   - OR: Right-click session cookie -> copy value
+
+2. With session cookie, you can:
+   a. Call /api/v1/chat with proper payload
+   b. Call server actions via POST with Next-Action header
+   c. Download auth-gated JS chunks and source maps
+   d. Extract all remaining server action IDs
+
+3. Server Action calling protocol:
+   POST https://aichat.uva.nl/
+   Headers:
+     Next-Action: {action-hash-id}
+     Content-Type: text/plain;charset=UTF-8
+     Cookie: {session-cookies}
+   Body: [arg1, arg2, ...]  (JSON array of arguments)
+
+4. Chat API (/api/v1/chat) likely expects:
+   POST with JSON body containing:
+     - id: string (thread ID)
+     - messages: array of {role, content}
+     - model: string (e.g. "gpt-5.1")
+     - temperature, top_p, etc.
+
+5. Consider using mitmproxy for comprehensive traffic capture:
+   $ mitmproxy --listen-port 8080
+   Then configure Firefox to proxy through localhost:8080
+
+
+================================================================================
+END OF ANALYSIS
+================================================================================

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 40" fill="none">
+  <!-- UvA Sigel: Three Saint Andrew's crosses (XXX) - the Amsterdam coat of arms -->
+  <g fill="#bc0031">
+    <!-- Cross 1 -->
+    <path d="M8 4 L12 4 L16 10 L20 4 L24 4 L18 13 L24 22 L20 22 L16 16 L12 22 L8 22 L14 13 Z"/>
+    <!-- Cross 2 -->
+    <path d="M26 4 L30 4 L34 10 L38 4 L42 4 L36 13 L42 22 L38 22 L34 16 L30 22 L26 22 L32 13 Z"/>
+    <!-- Cross 3 -->
+    <path d="M44 4 L48 4 L52 10 L56 4 L60 4 L54 13 L60 22 L56 22 L52 16 L48 22 L44 22 L50 13 Z"/>
+  </g>
+  <!-- "Universiteit van Amsterdam" text -->
+  <text x="8" y="36" font-family="Georgia, serif" font-size="9" fill="#1B1918" letter-spacing="0.5">
+    Universiteit van Amsterdam
+  </text>
+</svg>
