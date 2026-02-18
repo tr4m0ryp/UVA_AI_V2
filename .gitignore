@@ -9,26 +9,39 @@ __pycache__/
 *.pyo
 
 # ─── C build artifacts ────────────────────────────────────────────────────────
-proxy/build/
-proxy/uva-proxy
+services/proxy/build/
+services/proxy/uva-proxy
+
+# ─── Next.js build output ─────────────────────────────────────────────────────
+.next/
 
 # ─── Databases ────────────────────────────────────────────────────────────────
-proxy/proxy.db
-proxy/proxy.db-shm
-proxy/proxy.db-wal
+services/proxy/proxy.db
+services/proxy/proxy.db-shm
+services/proxy/proxy.db-wal
 *.db
 *.db-shm
 *.db-wal
 
 # ─── Secrets / environment files ──────────────────────────────────────────────
-proxy/proxy.env
+services/proxy/proxy.env
 *.env
 .env
 .env.*
 !.env.example
 
 # ─── Captured traffic (potentially sensitive) ─────────────────────────────────
-proxy/captured_traffic.json
+upstream/capture/captured_traffic.json
+upstream/capture/capture_summary.txt
+
+# ─── Source maps (extracted source already in upstream/extracted/) ─────────────
+upstream/bundles/*.map
+
+# ─── Prettified bundle duplicates ─────────────────────────────────────────────
+upstream/bundles/*_pretty.js
+
+# ─── Raw HTML captures (not real API docs) ────────────────────────────────────
+upstream/bundles/api_*.txt
 
 # ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store

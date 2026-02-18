@@ -10,8 +10,8 @@
 set -e
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-PROXY_DIR="$ROOT/proxy"
-WEBUI_DIR="$ROOT/open-webui"
+PROXY_DIR="$ROOT/services/proxy"
+WEBUI_DIR="$ROOT/vendor/open-webui"
 VENV_DIR="$WEBUI_DIR/.venv"
 
 PIDS=()
@@ -45,7 +45,7 @@ cd "$WEBUI_DIR"
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "[start-all] ERROR: Python venv not found at $VENV_DIR"
-    echo "[start-all] Run: cd open-webui && python3 -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements.txt"
+    echo "[start-all] Run: cd vendor/open-webui && python3 -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements.txt"
     cleanup
 fi
 
