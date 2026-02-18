@@ -45,6 +45,11 @@ export default function SettingsPage() {
             <code>__Host-authjs.csrf-token=...; authjs.session-token=...</code>
           </li>
         </ol>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16, fontStyle: "italic" }}>
+          Alternatively, install the <strong>UvA Session Sync</strong> Chrome extension
+          (in the <code>extension/</code> directory) to sync cookies automatically
+          whenever you log in to aichat.uva.nl.
+        </p>
         <textarea
           style={{ width: "100%", height: 100, resize: "vertical", marginBottom: 12, fontFamily: "monospace" }}
           value={cookie}
