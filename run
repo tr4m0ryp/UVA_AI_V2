@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RESET='\033[0m'
+
+log()  { printf "${GREEN}[run]${RESET} %s\n" "$*"; }
+warn() { printf "${YELLOW}[run]${RESET} %s\n" "$*"; }
+die()  { printf "${RED}[run]${RESET} %s\n" "$*" >&2; exit 1; }
+
+# --- Check prerequisites ---
+
+if ! command -v bun &>/dev/null; then
+  die "bun is not installed. Install it: curl -fsSL https://bun.sh/install | bash"
+fi
+
+# --- Ensure .env exists ---
+
+if [ ! -f .env ]; then
+  if [ -f .env.example ]; then
+    warn ".env not found -- copying from .env.example"
+    warn "Edit .env with your real credentials before using the app."
+    cp .env.example .env
+  else
+    die ".env not found and no .env.example to copy from."
+  fi
+fi
+
+# --- Check required env vars ---
+
+REQUIRED_VARS=(
+  NEXT_PUBLIC_SUPABASE_URL
+  NEXT_PUBLIC_SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY
+  NEXTAUTH_SECRET
+  AZURE_AD_CLIENT_ID
+  AZURE_AD_CLIENT_SECRET
+  AZURE_AD_TENANT_ID
+)
+
+# Parse .env safely (handles values with special chars, empty values, comments)
+declare -A ENV_VALS
+while IFS= read -r line; do
+  [[ -z "$line" || "$line" == \#* ]] && continue
+  key="${line%%=*}"
+  val="${line#*=}"
+  ENV_VALS["$key"]="$val"
+  export "$key"="$val"
+done < .env
+
+MISSING=()
+for var in "${REQUIRED_VARS[@]}"; do
+  val="${ENV_VALS[$var]:-}"
+  if [ -z "$val" ] || [[ "$val" == *"<"* ]]; then
+    MISSING+=("$var")
+  fi
+done
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+  warn "The following env vars are missing or still have placeholder values in .env:"
+  for var in "${MISSING[@]}"; do
+    warn "  - $var"
+  done
+  warn ""
+  warn "The dev server will start, but some features will not work."
+  warn "Edit .env to fix this."
+  echo ""
+fi
+
+# --- Set NEXTAUTH_URL for local dev if not overridden ---
+
+export NEXTAUTH_URL="${NEXTAUTH_URL:-http://localhost:3000}"
+
+# --- Install dependencies if needed ---
+
+if [ ! -d node_modules ]; then
+  log "Installing dependencies..."
+  bun install
+fi
+
+# --- Start dev server ---
+
+log "Starting Next.js dev server (Turbopack)..."
+log "URL: http://localhost:3000"
+echo ""
+
+exec bun run dev

@@ -4,15 +4,18 @@ on:
   push:
     branches: [main]
     paths:
-      - 'services/web/**'
+      - 'app/**'
+      - 'lib/**'
+      - 'supabase/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'next.config.ts'
+      - 'tsconfig.json'
       - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/web
 
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +45,6 @@ jobs:
       - name: Run Supabase migrations
         run: |
           npx supabase db push --db-url "${{ secrets.SUPABASE_DB_URL }}"
-        working-directory: services/web
 
       - name: Deploy to Vercel
         run: |
