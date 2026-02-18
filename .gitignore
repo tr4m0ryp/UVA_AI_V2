@@ -21,6 +21,9 @@ node_modules/
 # Upstream research artifacts (large, not part of the app)
 upstream/
 
+# Project instructions (local only)
+CLAUDE.md
+
 # OS / editor
 .DS_Store
 Thumbs.db
