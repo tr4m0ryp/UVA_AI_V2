@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/dashboard/css/auth.css">
     <link rel="stylesheet" href="/dashboard/css/sidebar.css">
     <link rel="stylesheet" href="/dashboard/css/grading.css">
+    <link rel="stylesheet" href="/dashboard/css/usage.css">
 </head>
 <body>
     <!-- Login page -->
@@ -98,34 +99,51 @@
                 </div>
                 <div id="keys-grid" class="keys-grid"></div>
                 <div id="keys-empty" class="empty-state hidden">
-                    <p>No API keys yet. Create one to get started.</p>
+                    <span class="material-symbols-outlined empty-state-icon">key_off</span>
+                    <p class="empty-state-title">No API keys yet</p>
+                    <p class="empty-state-hint">Create a key to start using the proxy with any OpenAI-compatible client.</p>
                 </div>
             </div>
 
             <!-- Grading view -->
             <div id="view-grading" class="view hidden">
-                <div class="view-header">
+                <!-- History header (default) -->
+                <div class="view-header" id="grading-header-history">
                     <h2>Automated Grading</h2>
+                    <button id="btn-new-grading" class="btn btn-primary">New Grading</button>
                 </div>
-                <div class="grading-steps" id="grading-steps">
-                    <div class="step active" data-step="1">
-                        <span class="step-number">1</span>
-                        <span class="step-label">Setup</span>
-                    </div>
-                    <div class="step-line"></div>
-                    <div class="step" data-step="2">
-                        <span class="step-number">2</span>
-                        <span class="step-label">Submissions</span>
-                    </div>
-                    <div class="step-line"></div>
-                    <div class="step" data-step="3">
-                        <span class="step-number">3</span>
-                        <span class="step-label">Results</span>
-                    </div>
+                <div id="grading-history-grid" class="grading-history-grid"></div>
+                <div id="grading-history-empty" class="empty-state hidden">
+                    <p>No grading sessions yet. Click New Grading to get started.</p>
                 </div>
-                <div id="grading-panel-1" class="grading-panel"></div>
-                <div id="grading-panel-2" class="grading-panel hidden"></div>
-                <div id="grading-panel-3" class="grading-panel hidden"></div>
+
+                <!-- Workflow header (shown when in 3-step flow) -->
+                <div class="view-header hidden" id="grading-header-workflow">
+                    <h2>New Grading Session</h2>
+                    <button id="btn-back-grading" class="btn">Back</button>
+                </div>
+                <!-- Existing workflow, wrapped -->
+                <div id="grading-workflow" class="hidden">
+                    <div class="grading-steps" id="grading-steps">
+                        <div class="step active" data-step="1">
+                            <span class="step-number">1</span>
+                            <span class="step-label">Setup</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="2">
+                            <span class="step-number">2</span>
+                            <span class="step-label">Submissions</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="3">
+                            <span class="step-number">3</span>
+                            <span class="step-label">Results</span>
+                        </div>
+                    </div>
+                    <div id="grading-panel-1" class="grading-panel"></div>
+                    <div id="grading-panel-2" class="grading-panel hidden"></div>
+                    <div id="grading-panel-3" class="grading-panel hidden"></div>
+                </div>
             </div>
 
             <!-- Chat view -->
@@ -133,14 +151,9 @@
                 <iframe id="chat-iframe" class="chat-iframe" frameborder="0" allowfullscreen></iframe>
             </div>
 
-            <!-- Cloud Coding view (placeholder) -->
-            <div id="view-coding" class="view hidden">
-                <div class="view-header">
-                    <h2>Cloud Coding</h2>
-                </div>
-                <div class="empty-state">
-                    <p>Cloud coding environment is under development.</p>
-                </div>
+            <!-- Cloud Coding view -->
+            <div id="view-coding" class="view view-coding hidden">
+                <iframe id="coding-iframe" class="coding-iframe" frameborder="0" allowfullscreen allow="clipboard-read; clipboard-write"></iframe>
             </div>
         </div>
     </div>
@@ -150,7 +163,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modal-key-title">Create API Key</h3>
-                <button class="modal-close" id="modal-key-close">&times;</button>
+                <button class="modal-close" id="modal-key-close"><span class="material-symbols-outlined">close</span></button>
             </div>
             <form id="form-key">
                 <label>Name (optional)
@@ -184,6 +197,17 @@
                 <label>System Prompt (optional)
                     <textarea id="key-sysprompt" rows="3" placeholder="Custom instructions..."></textarea>
                 </label>
+                <fieldset class="tool-config-section">
+                    <legend>Tool Execution</legend>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="key-allow-tools" checked>
+                        Allow tool use (bash, file read/write, etc.)
+                    </label>
+                    <label id="tool-allowlist-label">Tool allowlist (comma-separated, empty = all allowed):
+                        <input type="text" id="key-tool-allowlist"
+                               placeholder="bash,read,write,edit,glob,grep,ls,webfetch">
+                    </label>
+                </fieldset>
                 <div class="modal-actions">
                     <button type="button" class="btn" id="modal-key-cancel">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="modal-key-submit">Create</button>
@@ -192,12 +216,52 @@
         </div>
     </div>
 
+    <!-- Key Usage Modal -->
+    <div id="modal-usage" class="modal hidden">
+        <div class="modal-content modal-usage-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-usage-title">Key Usage</h3>
+                    <div id="modal-usage-subtitle" class="usage-subtitle"></div>
+                </div>
+                <button class="modal-close" id="modal-usage-close"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="usage-stats-grid">
+                <div class="usage-stat">
+                    <div class="usage-stat-value" id="us-requests">-</div>
+                    <div class="usage-stat-label">Total Requests</div>
+                </div>
+                <div class="usage-stat">
+                    <div class="usage-stat-value" id="us-input">-</div>
+                    <div class="usage-stat-label">Input Tokens</div>
+                </div>
+                <div class="usage-stat">
+                    <div class="usage-stat-value" id="us-output">-</div>
+                    <div class="usage-stat-label">Output Tokens</div>
+                </div>
+                <div class="usage-stat">
+                    <div class="usage-stat-value" id="us-total">-</div>
+                    <div class="usage-stat-label">Total Tokens</div>
+                </div>
+            </div>
+            <div class="usage-secondary">
+                <span>Errors: <strong id="us-errors">-</strong></span>
+                <span>Avg Latency: <strong id="us-latency">-</strong></span>
+            </div>
+            <div class="usage-chart-section">
+                <div class="usage-chart-title">Activity (last 30 days)</div>
+                <div id="usage-chart" class="usage-chart"></div>
+                <div id="usage-no-data" class="usage-no-data hidden">No requests yet.</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Key Created Modal -->
     <div id="modal-created" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>API Key Created</h3>
-                <button class="modal-close" id="modal-created-close">&times;</button>
+                <button class="modal-close" id="modal-created-close"><span class="material-symbols-outlined">close</span></button>
             </div>
             <p>Copy this key now. You will not be able to see it again.</p>
             <div class="key-display">
@@ -216,9 +280,11 @@
     <script src="/dashboard/js/router.js"></script>
     <script src="/dashboard/js/sidebar.js"></script>
     <script src="/dashboard/js/overview.js"></script>
+    <script src="/dashboard/js/usage.js"></script>
     <script src="/dashboard/js/keys.js"></script>
     <script src="/dashboard/js/grading-api.js"></script>
     <script src="/dashboard/js/grading-ui.js"></script>
+    <script src="/dashboard/js/grading-history.js"></script>
     <script src="/dashboard/js/grading.js"></script>
     <script src="/dashboard/js/app.js"></script>
 </body>

@@ -35,7 +35,10 @@ Dashboard.app = (function() {
         });
         Dashboard.router.register('coding', {
             mount: function() {
-                window.location.href = 'http://127.0.0.1:5174';
+                var frame = document.getElementById('coding-iframe');
+                if (frame && !frame.src) {
+                    frame.src = 'http://127.0.0.1:5174?embedded=true';
+                }
             }
         });
 

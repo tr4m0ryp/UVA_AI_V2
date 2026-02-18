@@ -78,12 +78,21 @@ void response_start_sse(int fd)
 
 void response_send_sse_data(int fd, const char *data)
 {
-    /* chunked transfer encoding */
-    char line[8192];
-    int len = snprintf(line, sizeof(line), "data: %s\n\n", data);
-    char chunk[8320];
-    int clen = snprintf(chunk, sizeof(chunk), "%x\r\n%s\r\n", len, line);
+    /* "data: <data>\n\n" */
+    size_t data_len = strlen(data);
+    size_t line_len = data_len + 8; /* "data: " + "\n\n" + null */
+    char *line = malloc(line_len);
+    if (!line) return;
+    int len = snprintf(line, line_len, "data: %s\n\n", data);
+
+    /* "<hex len>\r\n<line>\r\n" */
+    size_t chunk_len = (size_t)len + 32;
+    char *chunk = malloc(chunk_len);
+    if (!chunk) { free(line); return; }
+    int clen = snprintf(chunk, chunk_len, "%x\r\n%s\r\n", len, line);
     write_all(fd, chunk, (size_t)clen);
+    free(chunk);
+    free(line);
 }
 
 void response_end_sse(int fd)

@@ -29,6 +29,9 @@ static const model_mapping_t g_models[] = {
     {"gpt-4o",              "gpt-4o",              "GPT-4o"},
     /* Open source */
     {"gpt-oss-120b",        "gpt-oss-120b",        "GPT-OSS 120B"},
+    /* Mistral */
+    {"mistral-large",       "mistral-large",       "Mistral Large"},
+    {"mistral-small-3.2",   "mistral-small-3.2",   "Mistral Small 3.2"},
 };
 
 static const int g_model_count = sizeof(g_models) / sizeof(g_models[0]);

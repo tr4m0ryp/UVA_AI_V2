@@ -36,7 +36,27 @@ static const char *SCHEMA_SQL =
     "  created_at TEXT DEFAULT (datetime('now')),"
     "  last_used TEXT,"
     "  is_active INTEGER DEFAULT 1"
-    ");";
+    ");"
+    "CREATE TABLE IF NOT EXISTS grading_sessions ("
+    "  id               INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,"
+    "  title            TEXT    NOT NULL,"
+    "  submission_count INTEGER NOT NULL DEFAULT 0,"
+    "  results_json     TEXT    NOT NULL DEFAULT '{}',"
+    "  created_at       TEXT    NOT NULL DEFAULT (datetime('now'))"
+    ");"
+    "CREATE TABLE IF NOT EXISTS request_logs ("
+    "  id         INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  api_key_id INTEGER NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,"
+    "  model      TEXT    NOT NULL,"
+    "  input_chars  INTEGER DEFAULT 0,"
+    "  output_chars INTEGER DEFAULT 0,"
+    "  success    INTEGER DEFAULT 1,"
+    "  latency_ms INTEGER DEFAULT 0,"
+    "  created_at TEXT    DEFAULT (datetime('now'))"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_logs_key_created"
+    "  ON request_logs(api_key_id, created_at);";
 
 int db_init(const char *path)
 {
@@ -67,6 +87,18 @@ int db_init(const char *path)
         g_db = NULL;
         return -1;
     }
+
+    /* Idempotent migrations: add columns to existing databases.
+     * SQLite returns SQLITE_ERROR on duplicate columns; we ignore that. */
+    sqlite3_exec(g_db,
+        "ALTER TABLE api_keys ADD COLUMN allow_tools INTEGER DEFAULT 1;",
+        NULL, NULL, NULL);
+    sqlite3_exec(g_db,
+        "ALTER TABLE api_keys ADD COLUMN tool_allowlist TEXT DEFAULT '';",
+        NULL, NULL, NULL);
+    sqlite3_exec(g_db,
+        "ALTER TABLE api_keys ADD COLUMN max_tokens_tool INTEGER DEFAULT 8192;",
+        NULL, NULL, NULL);
 
     fprintf(stderr, "Database initialized: %s\n", path);
     return 0;

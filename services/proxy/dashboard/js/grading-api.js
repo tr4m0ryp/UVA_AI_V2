@@ -95,11 +95,17 @@ Dashboard.gradingAPI = (function() {
     }
 
     function parseGradingResponse(content) {
-        var cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
-        cleaned = cleaned.trim();
+        /* Find the outermost JSON object, ignoring surrounding prose or code fences */
+        var start = content.indexOf('{');
+        var end   = content.lastIndexOf('}');
+        if (start === -1 || end === -1 || end < start) {
+            return { error: 'Failed to parse grading response as JSON' };
+        }
+        var cleaned = content.slice(start, end + 1);
 
+        var obj;
         try {
-            var obj = JSON.parse(cleaned);
+            obj = JSON.parse(cleaned);
         } catch (e) {
             return { error: 'Failed to parse grading response as JSON' };
         }

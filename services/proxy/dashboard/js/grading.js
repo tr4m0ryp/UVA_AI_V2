@@ -8,17 +8,65 @@ Dashboard.grading = (function() {
         rubric:        { text: '', fileName: '' },
         exampleAnswer: { text: '', fileName: '' },
         submissions: [],
-        nextSubmissionId: 1
+        nextSubmissionId: 1,
+        saved: false
     };
 
     var built = false;
 
     function mount() {
+        Dashboard.gradingHistory.mount();
+        Dashboard.gradingHistory.showHistory();
+    }
+
+    function startNew() {
+        state.step = 1;
+        state.assignment    = { text: '', fileName: '' };
+        state.rubric        = { text: '', fileName: '' };
+        state.exampleAnswer = { text: '', fileName: '' };
+        state.submissions   = [];
+        state.nextSubmissionId = 1;
+        state.saved = false;
+
         if (!built) {
             buildAll();
             built = true;
+        } else {
+            buildAll();
         }
-        showStep(state.step);
+        showStep(1);
+        Dashboard.gradingHistory.showWorkflow();
+    }
+
+    function showStoredResults(stored) {
+        state.step = 3;
+        state.assignment    = { text: '', fileName: stored.assignment || '' };
+        state.rubric        = { text: '', fileName: stored.rubric || '' };
+        state.exampleAnswer = { text: '', fileName: '' };
+        state.saved = true;
+
+        state.submissions = (stored.submissions || []).map(function(s, i) {
+            return {
+                id: i + 1,
+                name: s.name || '',
+                studentId: s.studentId || '',
+                fileName: s.fileName || '',
+                content: '',
+                status: s.status || 'done',
+                result: s.result || null,
+                error: s.error || null
+            };
+        });
+        state.nextSubmissionId = state.submissions.length + 1;
+
+        if (!built) {
+            buildAll();
+            built = true;
+        } else {
+            Dashboard.gradingUI.buildResultsPanel('grading-panel-3', state);
+        }
+        setStep(3);
+        Dashboard.gradingHistory.showWorkflow();
     }
 
     function unmount() {
@@ -164,6 +212,7 @@ Dashboard.grading = (function() {
         sub.status = 'done';
         sub.result = result;
         Dashboard.gradingUI.renderResults(state);
+        _maybeSaveSession();
     }
 
     function onGradeError(submission, err) {
@@ -172,6 +221,46 @@ Dashboard.grading = (function() {
         sub.status = 'error';
         sub.error = err.message || 'Unknown error';
         Dashboard.gradingUI.renderResults(state);
+        _maybeSaveSession();
+    }
+
+    function _maybeSaveSession() {
+        if (state.saved) return;
+        var allDone = state.submissions.every(function(s) {
+            return s.status === 'done' || s.status === 'error';
+        });
+        if (allDone && state.submissions.length > 0) {
+            _saveSession();
+        }
+    }
+
+    function _saveSession() {
+        state.saved = true;
+        var title = (state.assignment.fileName || 'Assignment') +
+                    ' - ' + new Date().toISOString().slice(0, 10);
+        var results = {
+            assignment: state.assignment.fileName,
+            rubric: state.rubric.fileName,
+            submissions: state.submissions.map(function(s) {
+                return {
+                    name: s.name,
+                    studentId: s.studentId,
+                    fileName: s.fileName,
+                    status: s.status,
+                    result: s.result,
+                    error: s.error
+                };
+            })
+        };
+        Dashboard.api.post('/api/dashboard/grading', {
+            title: title,
+            submission_count: state.submissions.length,
+            results_json: JSON.stringify(results)
+        }).then(function() {
+            Dashboard.gradingHistory.load();
+        }).catch(function(err) {
+            console.error('save session:', err);
+        });
     }
 
     function retrySubmission(id) {
@@ -198,6 +287,8 @@ Dashboard.grading = (function() {
     return {
         mount: mount,
         unmount: unmount,
+        startNew: startNew,
+        showStoredResults: showStoredResults,
         setStep: setStep,
         setAssignmentText: setAssignmentText,
         setAssignmentFile: setAssignmentFile,

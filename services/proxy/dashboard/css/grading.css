@@ -349,6 +349,42 @@
 .cd-score { font-weight: 600; font-size: 13px; color: var(--accent); }
 .cd-feedback { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
 
+.grading-history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 0 24px 24px;
+}
+
+.grading-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.grading-card:hover { border-color: var(--accent); }
+
+.grading-card-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    color: var(--text);
+}
+
+.grading-card-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.grading-card-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .grading-steps { padding: 12px 16px 16px; }
@@ -356,4 +392,5 @@
     .grading-form { padding: 0 16px 16px; }
     .submission-name { min-width: 80px; }
     .submission-studentid { min-width: 60px; }
+    .grading-history-grid { padding: 0 16px 16px; }
 }

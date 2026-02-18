@@ -58,17 +58,7 @@
             "output": 8192
           }
         }
-      },
-      "exclude": [
-        "claude-sonnet-4.5",
-        "claude-haiku-4.5",
-        "o3",
-        "o3-mini",
-        "o1",
-        "llama-3.3-70b",
-        "mistral-large",
-        "gpt-4.1-mini"
-      ]
+      }
     }
   },
   "server": {

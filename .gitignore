@@ -43,6 +43,9 @@ upstream/bundles/*_pretty.js
 # ─── Raw HTML captures (not real API docs) ────────────────────────────────────
 upstream/bundles/api_*.txt
 
+# ─── Runtime logs ─────────────────────────────────────────────────────────────
+logs/
+
 # ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

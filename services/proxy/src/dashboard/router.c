@@ -20,6 +20,11 @@ void dashboard_auth_browser_cancel(http_request_t *req);
 
 /* keys.c */
 void dashboard_keys_list(http_request_t *req, const db_user_t *user);
+/* grading.c */
+void dashboard_grading_list(http_request_t *req, const db_user_t *user);
+void dashboard_grading_save(http_request_t *req, const db_user_t *user);
+void dashboard_grading_get(http_request_t *req, const db_user_t *user, int64_t id);
+void dashboard_grading_delete(http_request_t *req, const db_user_t *user, int64_t id);
 void dashboard_keys_create(http_request_t *req, const db_user_t *user);
 void dashboard_keys_update(http_request_t *req, const db_user_t *user,
                            int64_t key_id);
@@ -27,6 +32,10 @@ void dashboard_keys_delete(http_request_t *req, const db_user_t *user,
                            int64_t key_id);
 void dashboard_keys_toggle(http_request_t *req, const db_user_t *user,
                            int64_t key_id);
+
+/* usage.c */
+void dashboard_keys_usage(http_request_t *req, const db_user_t *user,
+                          int64_t key_id);
 
 static int authenticate_dashboard(http_request_t *req, db_user_t *user)
 {
@@ -97,6 +106,17 @@ void dashboard_handle(http_request_t *req)
         return;
     }
 
+    /* /api/dashboard/keys/{id}/usage */
+    if (strncmp(path, "/api/dashboard/keys/", 20) == 0 &&
+        strstr(path, "/usage")) {
+        int64_t kid = extract_path_id(path, "/api/dashboard/keys");
+        if (kid > 0)
+            dashboard_keys_usage(req, &user, kid);
+        else
+            response_send_error(req->client_fd, 400, "Invalid key ID");
+        return;
+    }
+
     /* /api/dashboard/keys/{id}/toggle */
     if (strncmp(path, "/api/dashboard/keys/", 20) == 0 &&
         strstr(path, "/toggle")) {
@@ -119,6 +139,31 @@ void dashboard_handle(http_request_t *req)
             dashboard_keys_update(req, &user, kid);
         else if (strcmp(req->method, "DELETE") == 0)
             dashboard_keys_delete(req, &user, kid);
+        else
+            response_send_error(req->client_fd, 405, "Method not allowed");
+        return;
+    }
+
+    if (strcmp(path, "/api/dashboard/grading") == 0) {
+        if (strcmp(req->method, "GET") == 0)
+            dashboard_grading_list(req, &user);
+        else if (strcmp(req->method, "POST") == 0)
+            dashboard_grading_save(req, &user);
+        else
+            response_send_error(req->client_fd, 405, "Method not allowed");
+        return;
+    }
+
+    if (strncmp(path, "/api/dashboard/grading/", 23) == 0) {
+        int64_t gid = extract_path_id(path, "/api/dashboard/grading");
+        if (gid <= 0) {
+            response_send_error(req->client_fd, 400, "Invalid ID");
+            return;
+        }
+        if (strcmp(req->method, "GET") == 0)
+            dashboard_grading_get(req, &user, gid);
+        else if (strcmp(req->method, "DELETE") == 0)
+            dashboard_grading_delete(req, &user, gid);
         else
             response_send_error(req->client_fd, 405, "Method not allowed");
         return;

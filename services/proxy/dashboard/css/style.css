@@ -13,7 +13,7 @@
     --text-muted: #A8A29F;
     --accent: #bc0031;
     --accent-hover: #840022;
-    --accent-light: #bc0031;
+    --accent-light: #faebef;
     --border: #D7D6D4;
     --danger: #ef4444;
     --danger-hover: #dc2626;
@@ -60,6 +60,15 @@ a:hover { text-decoration: underline; }
 .btn-danger { background: var(--danger); border-color: var(--danger); color: #ffffff; }
 .btn-danger:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon {
+    padding: 6px; width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0;
+}
+.btn-icon .material-symbols-outlined {
+    font-size: 16px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    line-height: 1;
+}
 
 /* Login */
 .login-card {
@@ -149,22 +158,23 @@ textarea:focus, input:focus, select:focus {
 .key-card-model {
     display: inline-block;
     padding: 2px 8px;
-    background: #faebef;
+    background: var(--accent-light);
     color: var(--accent);
-    border: 1px solid #ebb3c1;
+    border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 12px;
     font-weight: 500;
 }
 .key-card-params {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 16px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 12px 0;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px 16px; margin: 12px 0;
 }
-.key-card-params span { color: var(--text-primary); }
+.key-card-params > div { display: flex; flex-direction: column; gap: 2px; }
+.param-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.key-card-params span { color: var(--text-primary); font-size: 13px; font-weight: 500; }
 .key-card-actions {
     display: flex;
     gap: 8px;
@@ -177,6 +187,16 @@ textarea:focus, input:focus, select:focus {
     padding: 60px 24px;
     color: var(--text-secondary);
 }
+.empty-state-icon {
+    font-size: 48px;
+    font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 48;
+    color: var(--text-muted); display: block; margin-bottom: 16px;
+}
+.empty-state-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;
+}
+.empty-state-hint { font-size: 14px; color: var(--text-muted); max-width: 360px; margin: 0 auto; }
 
 /* Toggle switch */
 .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
@@ -197,7 +217,7 @@ textarea:focus, input:focus, select:focus {
     border-radius: 50%;
     transition: transform 0.2s;
 }
-.toggle input:checked + .toggle-slider { background: var(--success); }
+.toggle input:checked + .toggle-slider { background: var(--accent); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
 
 /* Modal */
@@ -224,9 +244,16 @@ textarea:focus, input:focus, select:focus {
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .modal-close {
     background: none; border: none; color: var(--text-secondary);
-    font-size: 24px; cursor: pointer;
+    font-size: 0; cursor: pointer; padding: 4px;
+    border-radius: var(--radius); transition: background 0.15s, color 0.15s;
+    display: flex; align-items: center; justify-content: center;
 }
-.modal-close:hover { color: var(--text-primary); }
+.modal-close .material-symbols-outlined {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    line-height: 1;
+}
+.modal-close:hover { color: var(--text-primary); background: var(--bg-primary); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 form label { display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
 input[type="range"] { width: 100%; margin-top: 6px; accent-color: var(--accent); }
@@ -235,7 +262,7 @@ input[type="range"] { width: 100%; margin-top: 6px; accent-color: var(--accent);
 .key-display {
     display: flex; align-items: center; gap: 8px;
     margin: 16px 0; padding: 12px;
-    background: #f5d9e0; border: 1px solid #ebb3c1; border-radius: var(--radius);
+    background: var(--accent-light); border: 1px solid var(--border); border-radius: var(--radius);
 }
 .key-display code {
     flex: 1; font-family: "SF Mono", "Fira Code", monospace;

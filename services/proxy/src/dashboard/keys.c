@@ -37,6 +37,12 @@ static struct json_object *key_to_json(const db_api_key_t *k)
         json_object_new_string(k->system_prompt));
     json_object_object_add(obj, "is_active",
         json_object_new_boolean(k->is_active));
+    json_object_object_add(obj, "allow_tools",
+        json_object_new_boolean(k->allow_tools));
+    json_object_object_add(obj, "tool_allowlist",
+        json_object_new_string(k->tool_allowlist));
+    json_object_object_add(obj, "max_tokens_tool",
+        json_object_new_int(k->max_tokens_tool));
     return obj;
 }
 
@@ -138,6 +144,10 @@ void dashboard_keys_create(http_request_t *req, const db_user_t *user)
              json_get_str(body, "reasoning_effort", "medium"));
     snprintf(key.system_prompt, sizeof(key.system_prompt), "%s",
              json_get_str(body, "system_prompt", ""));
+    key.allow_tools = json_get_int(body, "allow_tools", 1);
+    snprintf(key.tool_allowlist, sizeof(key.tool_allowlist), "%s",
+             json_get_str(body, "tool_allowlist", ""));
+    key.max_tokens_tool = json_get_int(body, "max_tokens_tool", 8192);
     key.is_active = 1;
     json_object_put(body);
 
@@ -196,6 +206,10 @@ void dashboard_keys_update(http_request_t *req, const db_user_t *user,
              json_get_str(body, "reasoning_effort", "medium"));
     snprintf(key.system_prompt, sizeof(key.system_prompt), "%s",
              json_get_str(body, "system_prompt", ""));
+    key.allow_tools = json_get_int(body, "allow_tools", 1);
+    snprintf(key.tool_allowlist, sizeof(key.tool_allowlist), "%s",
+             json_get_str(body, "tool_allowlist", ""));
+    key.max_tokens_tool = json_get_int(body, "max_tokens_tool", 8192);
     json_object_put(body);
 
     if (!key.model[0]) {

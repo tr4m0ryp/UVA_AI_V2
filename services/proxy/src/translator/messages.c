@@ -90,8 +90,9 @@ char *translate_request(const char *openai_body, const char *thread_id)
     const char *uva_model = models_to_uva(model);
 
     /*
-     * The UvA frontend sends only the last message as "message" (not
-     * the full history). Build the last message object with parts.
+     * The UvA API only accepts a single "message" (the last turn).
+     * For multi-turn conversations, serialize prior messages as a text
+     * prefix so the model sees the full conversation context.
      * Message IDs must be UUID format or UvA returns HTTP 500.
      */
     struct json_object *msgs;
@@ -111,7 +112,56 @@ char *translate_request(const char *openai_body, const char *thread_id)
             if (json_object_object_get_ex(m, "content", &content_o))
                 c = json_object_get_string(content_o);
 
-            last_msg = make_uva_message(r, c, last_msg_id);
+            /* Build conversation history prefix from messages[0..n-2] */
+            if (len > 1) {
+                /* Estimate buffer: 64 bytes overhead + content per message */
+                size_t hist_cap = 256;
+                for (int i = 0; i < len - 1; i++) {
+                    struct json_object *hm = json_object_array_get_idx(msgs,
+                        (size_t)i);
+                    struct json_object *hc;
+                    if (json_object_object_get_ex(hm, "content", &hc))
+                        hist_cap += strlen(json_object_get_string(hc)) + 32;
+                }
+                char *hist = malloc(hist_cap);
+                if (hist) {
+                    int hpos = 0;
+                    hpos += snprintf(hist + hpos, hist_cap - (size_t)hpos,
+                        "[Previous conversation]\n");
+                    for (int i = 0; i < len - 1; i++) {
+                        struct json_object *hm = json_object_array_get_idx(msgs,
+                            (size_t)i);
+                        struct json_object *hr, *hc;
+                        const char *hrole = "user", *hcont = "";
+                        if (json_object_object_get_ex(hm, "role", &hr))
+                            hrole = json_object_get_string(hr);
+                        if (json_object_object_get_ex(hm, "content", &hc))
+                            hcont = json_object_get_string(hc);
+                        /* Capitalize role for readability */
+                        char cap_role[16];
+                        snprintf(cap_role, sizeof(cap_role), "%s", hrole);
+                        if (cap_role[0] >= 'a' && cap_role[0] <= 'z')
+                            cap_role[0] = (char)(cap_role[0] - 32);
+                        hpos += snprintf(hist + hpos, hist_cap - (size_t)hpos,
+                            "%s: %s\n", cap_role, hcont);
+                    }
+                    hpos += snprintf(hist + hpos, hist_cap - (size_t)hpos,
+                        "[End of previous conversation]\n\n");
+
+                    /* Combine history + current message content */
+                    size_t combined_len = (size_t)hpos + strlen(c) + 4;
+                    char *combined = malloc(combined_len);
+                    if (combined) {
+                        snprintf(combined, combined_len, "%s%s", hist, c);
+                        last_msg = make_uva_message(r, combined, last_msg_id);
+                        free(combined);
+                    }
+                    free(hist);
+                }
+            }
+
+            if (!last_msg)
+                last_msg = make_uva_message(r, c, last_msg_id);
         }
     }
 
@@ -174,99 +224,5 @@ char *translate_request(const char *openai_body, const char *thread_id)
     return result;
 }
 
-static char *generate_completion_id(void)
-{
-    char id[64];
-    snprintf(id, sizeof(id), "chatcmpl-%lx%04x",
-             (unsigned long)time(NULL), rand() & 0xFFFF);
-    return strdup(id);
-}
-
-char *translate_response(const char *content, const char *model,
-                         const char *completion_id)
-{
-    struct json_object *resp = json_object_new_object();
-    char *cid = completion_id ? strdup(completion_id) : generate_completion_id();
-
-    json_object_object_add(resp, "id", json_object_new_string(cid));
-    json_object_object_add(resp, "object",
-        json_object_new_string("chat.completion"));
-    json_object_object_add(resp, "created",
-        json_object_new_int64((int64_t)time(NULL)));
-    json_object_object_add(resp, "model",
-        json_object_new_string(model ? model : "unknown"));
-
-    /* choices */
-    struct json_object *choices = json_object_new_array();
-    struct json_object *choice = json_object_new_object();
-    json_object_object_add(choice, "index", json_object_new_int(0));
-
-    struct json_object *message = json_object_new_object();
-    json_object_object_add(message, "role",
-        json_object_new_string("assistant"));
-    json_object_object_add(message, "content",
-        json_object_new_string(content ? content : ""));
-    json_object_object_add(choice, "message", message);
-    json_object_object_add(choice, "finish_reason",
-        json_object_new_string("stop"));
-
-    json_object_array_add(choices, choice);
-    json_object_object_add(resp, "choices", choices);
-
-    /* usage (estimated) */
-    struct json_object *usage = json_object_new_object();
-    json_object_object_add(usage, "prompt_tokens", json_object_new_int(0));
-    json_object_object_add(usage, "completion_tokens", json_object_new_int(0));
-    json_object_object_add(usage, "total_tokens", json_object_new_int(0));
-    json_object_object_add(resp, "usage", usage);
-
-    const char *str = json_object_to_json_string_ext(resp,
-        JSON_C_TO_STRING_PLAIN);
-    char *result = strdup(str);
-
-    if (!completion_id) free(cid);
-    json_object_put(resp);
-    return result;
-}
-
-char *translate_stream_chunk(const char *delta_content, const char *model,
-                             const char *completion_id, int index)
-{
-    struct json_object *chunk = json_object_new_object();
-
-    json_object_object_add(chunk, "id",
-        json_object_new_string(completion_id));
-    json_object_object_add(chunk, "object",
-        json_object_new_string("chat.completion.chunk"));
-    json_object_object_add(chunk, "created",
-        json_object_new_int64((int64_t)time(NULL)));
-    json_object_object_add(chunk, "model",
-        json_object_new_string(model ? model : "unknown"));
-
-    struct json_object *choices = json_object_new_array();
-    struct json_object *choice = json_object_new_object();
-    json_object_object_add(choice, "index", json_object_new_int(index));
-
-    struct json_object *delta = json_object_new_object();
-    if (delta_content) {
-        json_object_object_add(delta, "content",
-            json_object_new_string(delta_content));
-    }
-    json_object_object_add(choice, "delta", delta);
-    json_object_object_add(choice, "finish_reason",
-        delta_content ? NULL : json_object_new_string("stop"));
-
-    json_object_array_add(choices, choice);
-    json_object_object_add(chunk, "choices", choices);
-
-    const char *str = json_object_to_json_string_ext(chunk,
-        JSON_C_TO_STRING_PLAIN);
-    char *result = strdup(str);
-    json_object_put(chunk);
-    return result;
-}
-
-const char *translate_stream_done(void)
-{
-    return "[DONE]";
-}
+/* translate_response, translate_stream_chunk, translate_stream_done
+ * are in response_builder.c */

@@ -21,6 +21,9 @@ Dashboard.keys = (function() {
         document.getElementById('modal-created-close').addEventListener('click', closeCreatedModal);
         document.getElementById('modal-created-done').addEventListener('click', closeCreatedModal);
         document.getElementById('btn-copy-key').addEventListener('click', copyKey);
+        document.getElementById('modal-usage-close').addEventListener('click', function() {
+            Dashboard.usage.close();
+        });
 
         /* Slider value displays */
         bindSlider('key-temp', 'val-temp');
@@ -74,18 +77,22 @@ Dashboard.keys = (function() {
                     '<span class="key-card-model">' + esc(k.model) + '</span>' +
                 '</div>' +
                 '<div class="key-card-params">' +
-                    '<div>Temp: <span>' + k.temperature.toFixed(1) + '</span></div>' +
-                    '<div>Top P: <span>' + k.top_p.toFixed(2) + '</span></div>' +
-                    '<div>Max Tokens: <span>' + k.max_tokens + '</span></div>' +
-                    '<div>Reasoning: <span>' + esc(k.reasoning_effort) + '</span></div>' +
+                    '<div><div class="param-label">Temp</div><span>' + k.temperature.toFixed(1) + '</span></div>' +
+                    '<div><div class="param-label">Top P</div><span>' + k.top_p.toFixed(2) + '</span></div>' +
+                    '<div><div class="param-label">Max Tokens</div><span>' + k.max_tokens + '</span></div>' +
+                    '<div><div class="param-label">Reasoning</div><span>' + esc(k.reasoning_effort) + '</span></div>' +
                 '</div>' +
                 '<div class="key-card-actions">' +
                     '<label class="toggle">' +
                         '<input type="checkbox"' + (k.is_active ? ' checked' : '') + '>' +
                         '<span class="toggle-slider"></span>' +
                     '</label>' +
-                    '<button class="btn btn-sm btn-edit">Edit</button>' +
-                    '<button class="btn btn-sm btn-danger btn-delete">Delete</button>' +
+                    '<button class="btn btn-sm btn-icon btn-usage" title="View usage statistics">' +
+                        '<span class="material-symbols-outlined">bar_chart</span></button>' +
+                    '<button class="btn btn-sm btn-icon btn-edit" title="Edit key settings">' +
+                        '<span class="material-symbols-outlined">edit</span></button>' +
+                    '<button class="btn btn-sm btn-icon btn-danger btn-delete" title="Delete key">' +
+                        '<span class="material-symbols-outlined">delete</span></button>' +
                 '</div>';
 
             /* Toggle handler */
@@ -93,6 +100,11 @@ Dashboard.keys = (function() {
                 Dashboard.api.post('/api/dashboard/keys/' + k.id + '/toggle', {})
                     .then(function() { loadKeys(); })
                     .catch(function(err) { alert(err.message); loadKeys(); });
+            });
+
+            /* Usage handler */
+            card.querySelector('.btn-usage').addEventListener('click', function() {
+                openUsageModal(k);
             });
 
             /* Edit handler */
@@ -135,6 +147,8 @@ Dashboard.keys = (function() {
         setSlider('key-pres', 'val-pres', k.presence_penalty);
         document.getElementById('key-reasoning').value = k.reasoning_effort;
         document.getElementById('key-sysprompt').value = k.system_prompt || '';
+        document.getElementById('key-allow-tools').checked = k.allow_tools !== false;
+        document.getElementById('key-tool-allowlist').value = k.tool_allowlist || '';
         document.getElementById('modal-key').classList.remove('hidden');
     }
 
@@ -153,6 +167,8 @@ Dashboard.keys = (function() {
         setSlider('key-pres', 'val-pres', 0);
         document.getElementById('key-reasoning').value = 'medium';
         document.getElementById('key-sysprompt').value = '';
+        document.getElementById('key-allow-tools').checked = true;
+        document.getElementById('key-tool-allowlist').value = '';
     }
 
     function closeKeyModal() {
@@ -173,7 +189,9 @@ Dashboard.keys = (function() {
             frequency_penalty: parseFloat(document.getElementById('key-freq').value),
             presence_penalty: parseFloat(document.getElementById('key-pres').value),
             reasoning_effort: document.getElementById('key-reasoning').value,
-            system_prompt: document.getElementById('key-sysprompt').value
+            system_prompt: document.getElementById('key-sysprompt').value,
+            allow_tools: document.getElementById('key-allow-tools').checked ? 1 : 0,
+            tool_allowlist: document.getElementById('key-tool-allowlist').value.trim()
         };
     }
 
@@ -215,6 +233,10 @@ Dashboard.keys = (function() {
         var div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function openUsageModal(k) {
+        Dashboard.usage.open(k);
     }
 
     return {
