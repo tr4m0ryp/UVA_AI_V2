@@ -10,6 +10,27 @@ By reverse-engineering the platform's internal API (via publicly exposed Next.js
 
 ## Features
 
+### API Key Management
+
+Self-service key management with security built in.
+
+- **SHA-256 hashed storage** -- Raw keys are never stored. The key is shown exactly once at creation time, then only the hash is kept.
+- **Per-key defaults** -- Each key carries its own model, temperature, max tokens, system prompt, and reasoning effort. These are used when the API request doesn't specify overrides.
+- **Enable / disable** -- Toggle keys on and off without deleting them. Useful for rotating keys or temporarily revoking access.
+- **Usage audit** -- Every request is logged with the API key ID, model used, input/output character counts, latency, and success status.
+
+#### Creating a new key
+
+Click **New Key** in the dashboard, give it a name, pick a default model and optionally a system prompt or temperature override. The raw key is displayed once -- copy it before closing.
+
+![Creating a new API key](docs/screenshots/api_creation.png)
+
+#### Managing existing keys
+
+The keys overview shows every key with its creation date, last-used model, total request count, and toggle to enable or disable it. Click any key to drill into per-day usage stats.
+
+![API key management overview](docs/screenshots/api_keys.png)
+
 ### OpenAI-Compatible API
 
 A drop-in replacement for the OpenAI API. Point any tool at your proxy URL and it just works.
@@ -44,27 +65,6 @@ Built-in grading workflow for batch-processing student submissions with AI. Uplo
 - **Configurable model** -- Use GPT-5 for nuanced rubric interpretation or GPT-5 Nano for fast, cheap bulk grading.
 
 ![Automated assignment grading session](docs/screenshots/automated_grading.png)
-
-### API Key Management
-
-Self-service key management with security built in.
-
-- **SHA-256 hashed storage** -- Raw keys are never stored. The key is shown exactly once at creation time, then only the hash is kept.
-- **Per-key defaults** -- Each key carries its own model, temperature, max tokens, system prompt, and reasoning effort. These are used when the API request doesn't specify overrides.
-- **Enable / disable** -- Toggle keys on and off without deleting them. Useful for rotating keys or temporarily revoking access.
-- **Usage audit** -- Every request is logged with the API key ID, model used, input/output character counts, latency, and success status.
-
-#### Creating a new key
-
-Click **New Key** in the dashboard, give it a name, pick a default model and optionally a system prompt or temperature override. The raw key is displayed once -- copy it before closing.
-
-![Creating a new API key](docs/screenshots/api_creation.png)
-
-#### Managing existing keys
-
-The keys overview shows every key with its creation date, last-used model, total request count, and toggle to enable or disable it. Click any key to drill into per-day usage stats.
-
-![API key management overview](docs/screenshots/api_keys.png)
 
 ### Chrome Extension
 
