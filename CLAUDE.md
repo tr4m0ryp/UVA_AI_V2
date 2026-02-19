@@ -28,10 +28,9 @@
 ## Project Structure
 
 ```
-services/proxy/
+proxy/
   Makefile                         # Auto-discovers src/**/*.c via find
-  run                              # Run script
-  test_chat.sh                     # Chat endpoint test script
+  run                              # Lightweight single-service dev launcher
   include/
     apikey.h                       # API key generation/validation
     auth.h                         # UvA session auth
@@ -138,10 +137,11 @@ services/proxy/
     vendor/
       pdfjs/                       # PDF.js (grading file upload)
       xterm/                       # xterm.js (terminal UI)
-  docker/
-    Dockerfile                     # Docker image for the proxy
-    entrypoint.sh                  # Container entrypoint
-    setup-vps.sh                   # VPS bootstrap script
+
+docker/
+  Dockerfile                       # Docker image for the proxy
+  entrypoint.sh                    # Container entrypoint
+  setup-vps.sh                     # VPS bootstrap script
 
 start.sh                           # One-shot launcher for all services
 opencode.json                      # opencode provider/server config
@@ -149,12 +149,9 @@ vendor/
   open-webui/                      # Open WebUI submodule (chat frontend)
   opencode-web/                    # opencode-web submodule (cloud coding UI)
   codex/                           # OpenAI Codex CLI submodule
-upstream/
-  bundles/                         # Captured Next.js bundles from aichat.uva.nl
-  capture/                         # Traffic capture scripts
-  extracted/                       # Recovered TypeScript source from source maps
 docs/
   analysis.txt                     # Reverse engineering analysis notes
+  screenshots/                     # README screenshots
 ```
 
 ## Dependencies
@@ -186,7 +183,7 @@ docs/
 ./start.sh
 
 # Proxy only:
-cd services/proxy
+cd proxy
 make            # builds uva-proxy binary
 ./run           # or ./uva-proxy --port 8787
 ```

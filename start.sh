@@ -14,7 +14,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-PROXY_DIR="$ROOT/services/proxy"
+PROXY_DIR="$ROOT/proxy"
 WEBUI_DIR="$ROOT/vendor/open-webui"
 OC_WEB_DIR="$ROOT/vendor/opencode-web"
 VENV_DIR="$WEBUI_DIR/.venv"

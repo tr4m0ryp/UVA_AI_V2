@@ -15,25 +15,25 @@ __pycache__/
 *.egg-info/
 
 # ─── C build artifacts ────────────────────────────────────────────────────────
-services/proxy/build/
-services/proxy/uva-proxy
-services/proxy/uva-proxy.exe
+proxy/build/
+proxy/uva-proxy
+proxy/uva-proxy.exe
 
 # ─── Databases ────────────────────────────────────────────────────────────────
-services/proxy/proxy.db
-services/proxy/proxy.db-shm
-services/proxy/proxy.db-wal
+proxy/proxy.db
+proxy/proxy.db-shm
+proxy/proxy.db-wal
 *.db
 *.db-shm
 *.db-wal
 
 # ─── Secrets / environment files ──────────────────────────────────────────────
-services/proxy/proxy.env
+proxy/proxy.env
 *.env
 .env
 .env.*
 !.env.example
-!services/proxy/proxy.env.example
+!proxy/proxy.env.example
 
 # ─── Runtime / process files ──────────────────────────────────────────────────
 .stack.pids
@@ -44,15 +44,6 @@ nohup.out
 vendor/open-webui/build/
 vendor/open-webui/backend/data/
 vendor/open-webui/.venv/
-
-# ─── Upstream reverse-engineering artefacts (not needed by users) ─────────────
-upstream/bundles/
-upstream/capture/
-upstream/extracted/
-
-# ─── Test / development scaffolding ───────────────────────────────────────────
-services/proxy/test_grading/
-services/proxy/test_chat.sh
 
 # ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store

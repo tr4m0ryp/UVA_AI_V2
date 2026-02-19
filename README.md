@@ -160,8 +160,8 @@ git clone --recurse-submodules https://github.com/tr4m0ryp/UVA_AI_V2.git
 cd UVA_AI_V2
 
 # Configure your session cookie (see below for how to get it)
-cp services/proxy/proxy.env.example services/proxy/proxy.env
-$EDITOR services/proxy/proxy.env
+cp proxy/proxy.env.example proxy/proxy.env
+$EDITOR proxy/proxy.env
 
 # Start all services (installs missing tools automatically)
 ./start.sh
@@ -188,12 +188,12 @@ To reset a running stack and restart cleanly:
 2. Log in with your UvA / HvA credentials (Azure AD).
 3. Open DevTools (`F12`) → Application → Cookies → `https://aichat.uva.nl`.
 4. Copy the **full value** of `__Secure-next-auth.session-token`.
-5. Paste it into `services/proxy/proxy.env`:
+5. Paste it into `proxy/proxy.env`:
    ```
    UVA_SESSION_COOKIE="__Secure-next-auth.session-token=eyJ..."
    ```
 
-Alternatively, run `./services/proxy/uva-proxy --login` after building -- this opens a browser and captures the cookie automatically.
+Alternatively, run `./proxy/uva-proxy --login` after building -- this opens a browser and captures the cookie automatically.
 
 ### Services
 
@@ -209,7 +209,7 @@ Alternatively, run `./services/proxy/uva-proxy --login` after building -- this o
 If you only need the API without the chat UI or coding tools:
 
 ```bash
-cd services/proxy
+cd proxy
 make -j$(nproc)
 cp proxy.env.example proxy.env   # fill in your cookie
 ./uva-proxy --port 8787 --headless
