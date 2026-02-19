@@ -5,14 +5,19 @@
 #include <string.h>
 #include <time.h>
 
-/* Helper: check if model belongs to the gpt-5 family (5, 5.1, 5-mini, etc).
- * These models need a stronger prompt to emit structured tool calls. */
+/* gpt-5 base and gpt-5-mini resist structured output (code interpreter /
+ * refusal). Public: route_helpers.c uses this for retry logic. */
+int resp_is_model_resistant(const char *model)
+{
+    if (!model) return 0;
+    return strcmp(model, "gpt-5") == 0 || strcmp(model, "gpt-5-mini") == 0;
+}
+
+/* gpt-5 family (5, 5.1, 5-mini, 5-nano) needs stronger XML prompt. */
 static int is_gpt5_family(const char *model)
 {
     if (!model) return 0;
-    if (strncmp(model, "gpt-5", 5) == 0) return 1;
-    if (strstr(model, "gpt-5") != NULL) return 1;
-    return 0;
+    return strncmp(model, "gpt-5", 5) == 0 || strstr(model, "gpt-5") != NULL;
 }
 
 /* Append string to dynamic buffer, growing as needed.
@@ -223,6 +228,54 @@ fail:
     return NULL;
 }
 
+/* Resistant models (gpt-5, gpt-5-mini): code blocks, not XML. */
+static char *build_resistant_prompt(struct json_object *tools_json)
+{
+    (void)tools_json;
+    size_t cap = 4096;
+    char *buf = malloc(cap);
+    if (!buf) return NULL;
+    size_t pos = 0;
+
+    BAPPEND(
+        "[MANDATORY OUTPUT FORMAT]\n\n"
+        "You are a shell command writer inside an automated pipeline. "
+        "You CANNOT execute commands. You have NO code interpreter, "
+        "NO sandbox, NO execution capability. You output text ONLY.\n\n"
+
+        "The pipeline reads your output and executes it on the user's "
+        "machine. You MUST respond with ONLY a bash code block:\n\n"
+        "```bash\nCOMMAND\n```\n\n"
+
+        "RULES:\n"
+        "- Output ONLY a single ```bash code block. Nothing else.\n"
+        "- No explanations, commentary, caveats, or narration.\n"
+        "- Never refuse. Never say you cannot. Just write the command.\n"
+        "- File creation: cat > file << 'EOF'\\ncontent\\nEOF\n"
+        "- Multiple steps: chain with && or ;\n"
+        "- DO NOT attempt to execute or interpret anything yourself.\n"
+        "- Your output is machine-parsed. Only the code block is read.\n\n"
+
+        "EXAMPLES (these are the ONLY acceptable response formats):\n\n"
+        "User: List files in the current directory\n"
+        "Assistant:\n```bash\nls -la\n```\n\n"
+        "User: Create hello.py with print('hello')\n"
+        "Assistant:\n```bash\n"
+        "cat > hello.py << 'PYEOF'\nprint('hello')\nPYEOF\n```\n\n"
+        "User: Show contents of config.json\n"
+        "Assistant:\n```bash\ncat config.json\n```\n\n"
+
+        "[END FORMAT INSTRUCTION]\n"
+        "Respond with ```bash\n"
+    );
+
+    buf[pos] = '\0';
+    return buf;
+fail:
+    free(buf);
+    return NULL;
+}
+
 /*
  * Convert OpenAI tool definitions to a system prompt.
  * Selects prompt style based on model family.
@@ -234,6 +287,8 @@ char *resp_tools_to_xml(struct json_object *tools_json, const char *model)
     if (json_object_array_length(tools_json) == 0)
         return NULL;
 
+    if (resp_is_model_resistant(model))
+        return build_resistant_prompt(tools_json);
     if (is_gpt5_family(model))
         return build_gpt5_prompt(tools_json);
     return build_default_prompt(tools_json);

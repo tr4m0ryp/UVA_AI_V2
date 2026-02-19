@@ -55,7 +55,11 @@ char *resp_strip_tool_calls(const char *text);
 
 /* Code block extraction fallback (defined in tools_parse.c) */
 char *resp_extract_code_block_cmd(const char *text);
+char *resp_extract_inline_cmd(const char *text);
 void  resp_synthesize_tool_call(resp_result_t *result, const char *cmd);
+
+/* Model classification (defined in tools.c) */
+int resp_is_model_resistant(const char *model);
 
 /* Route helpers (defined in route_helpers.c) */
 int  resp_parse_request(struct json_object *parsed, resp_request_t *req);

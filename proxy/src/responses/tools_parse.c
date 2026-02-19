@@ -3,13 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
- * Parse <function_call name="...">...</function_call> blocks from model
- * output. Also accepts <tool_call> for backward compatibility.
- * Uses simple pointer-based string search (no regex).
- * Generates a call_id for each match.
- * Returns number of calls found.
- */
+/* Parse <function_call>/<tool_call> XML blocks from model output.
+ * Returns number of calls found. */
 int resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
                           int max_calls)
 {
@@ -109,11 +104,7 @@ int resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
     return count;
 }
 
-/*
- * Find the next opening tag (either <function_call or <tool_call).
- * Sets *close_str and *close_len for the corresponding closing tag.
- * Returns pointer to the opening tag, or NULL if not found.
- */
+/* Find next <function_call or <tool_call opening tag. */
 static const char *find_next_open_tag(const char *p,
                                        const char **close_str,
                                        size_t *close_len)
@@ -142,10 +133,7 @@ static const char *find_next_open_tag(const char *p,
     return start;
 }
 
-/*
- * Strip function_call and tool_call XML blocks from text.
- * Handles both tag names. Caller frees the returned string.
- */
+/* Strip function_call/tool_call XML blocks from text. Caller frees. */
 char *resp_strip_tool_calls(const char *text)
 {
     if (!text) return NULL;
@@ -199,11 +187,7 @@ char *resp_strip_tool_calls(const char *text)
     return out;
 }
 
-/*
- * Extract a shell command from the first markdown code block in text.
- * Looks for ```bash, ```sh, ```cmd, ```powershell, or bare ```.
- * Returns a newly allocated string with the command, or NULL.
- */
+/* Extract shell command from first markdown code block. Caller frees. */
 char *resp_extract_code_block_cmd(const char *text)
 {
     if (!text) return NULL;
@@ -238,11 +222,46 @@ char *resp_extract_code_block_cmd(const char *text)
     return NULL;
 }
 
-/*
- * Build a synthetic exec_command tool call from a command string.
- * Used as fallback when the model refuses XML but includes commands
- * in markdown code blocks. Properly escapes JSON.
- */
+/* Extract command from inline `backticks`. Prefers first with space. */
+char *resp_extract_inline_cmd(const char *text)
+{
+    if (!text) return NULL;
+    const char *best = NULL;
+    size_t best_len = 0;
+
+    for (const char *p = text; *p; ) {
+        /* Skip triple-backtick code blocks */
+        if (p[0] == '`' && p[1] == '`' && p[2] == '`') {
+            const char *e = strstr(p + 3, "```");
+            p = e ? e + 3 : p + strlen(p);
+            continue;
+        }
+        if (*p != '`') { p++; continue; }
+        const char *s = ++p;
+        const char *e = strchr(s, '`');
+        if (!e || e == s) continue;
+        size_t len = (size_t)(e - s);
+        p = e + 1;
+        if (len < 2 || len >= RESP_MAX_ARGS) continue;
+        /* Prefer first content with a space (command + args) */
+        if (len >= 4 && memchr(s, ' ', len)) {
+            char *cmd = malloc(len + 1);
+            if (!cmd) return NULL;
+            memcpy(cmd, s, len);
+            cmd[len] = '\0';
+            return cmd;
+        }
+        if (len > best_len) { best = s; best_len = len; }
+    }
+    if (!best) return NULL;
+    char *cmd = malloc(best_len + 1);
+    if (!cmd) return NULL;
+    memcpy(cmd, best, best_len);
+    cmd[best_len] = '\0';
+    return cmd;
+}
+
+/* Build synthetic exec_command tool call from a command string. */
 void resp_synthesize_tool_call(resp_result_t *result, const char *cmd)
 {
     result->tool_call_count = 1;

@@ -148,6 +148,15 @@ static const char *RETRY_FORCE_MSG =
     "</function_call>\n\n"
     "Output ONLY the completed XML block above. Nothing else.";
 
+static const char *RETRY_FORCE_CODEBLOCK =
+    "[RESPONSE REJECTED -- WRONG FORMAT]\n\n"
+    "Your previous response was discarded because it did not contain "
+    "a bash code block. This pipeline only reads ```bash code blocks.\n\n"
+    "Rewrite your response. Put the shell command inside a code block:\n\n"
+    "```bash\nCOMMAND_HERE\n```\n\n"
+    "Replace COMMAND_HERE with the command from your previous answer. "
+    "Output NOTHING except the code block.";
+
 /*
  * Buffer a tool-bearing request through upstream and parse for tool calls.
  * If the model returns 0 tool calls, retry once with a forcing prompt.
@@ -175,8 +184,12 @@ int resp_tool_request_with_retry(struct json_object *messages,
     if (!result->full_text || !result->full_text[0]) return 0;
 
     /* No tool calls detected -- retry with forcing prompt */
+    int resistant = resp_is_model_resistant(model);
+    const char *force_msg = resistant
+        ? RETRY_FORCE_CODEBLOCK : RETRY_FORCE_MSG;
     fprintf(stderr, "  [responses] 0 tool calls detected, retrying "
-            "with forcing prompt (model: %s)\n", model);
+            "with %s forcing prompt (model: %s)\n",
+            resistant ? "codeblock" : "XML", model);
 
     struct json_object *asst = json_object_new_object();
     json_object_object_add(asst, "role",
@@ -189,7 +202,7 @@ int resp_tool_request_with_retry(struct json_object *messages,
     json_object_object_add(force, "role",
         json_object_new_string("user"));
     json_object_object_add(force, "content",
-        json_object_new_string(RETRY_FORCE_MSG));
+        json_object_new_string(force_msg));
     json_object_array_add(messages, force);
 
     free(result->full_text);
@@ -210,13 +223,18 @@ int resp_tool_request_with_retry(struct json_object *messages,
     /* If retry produced tool calls, we're done */
     if (result->tool_call_count > 0) return 0;
 
-    /* Last resort: extract command from markdown code blocks.
-     * The model refused XML but included the command in a code block. */
+    /* Last resort: extract command from code blocks or inline backticks.
+     * The model refused XML but included the command somewhere. */
     if (result->full_text && result->full_text[0]) {
         char *cmd = resp_extract_code_block_cmd(result->full_text);
+        const char *src = "code block";
+        if (!cmd) {
+            cmd = resp_extract_inline_cmd(result->full_text);
+            src = "inline backtick";
+        }
         if (cmd) {
-            fprintf(stderr, "  [responses] extracted command from code "
-                    "block: %.80s%s\n", cmd,
+            fprintf(stderr, "  [responses] extracted command from %s: "
+                    "%.80s%s\n", src, cmd,
                     strlen(cmd) > 80 ? "..." : "");
             resp_synthesize_tool_call(result, cmd);
             free(cmd);
