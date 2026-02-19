@@ -38,6 +38,15 @@ char *translate_response(const char *content, const char *model,
 char *translate_stream_chunk(const char *delta_content, const char *model,
                              const char *completion_id, int index);
 
+/* Build an SSE chunk with a custom delta key (e.g. "reasoning_content"). */
+char *translate_stream_chunk_ex(const char *delta_content,
+                                const char *delta_key, const char *model,
+                                const char *completion_id, int index);
+
+/* Build a non-streaming response with separate reasoning content. */
+char *translate_response_ex(const char *content, const char *reasoning,
+                            const char *model, const char *completion_id);
+
 /* Build the final [DONE] SSE line. Returns static string. */
 const char *translate_stream_done(void);
 

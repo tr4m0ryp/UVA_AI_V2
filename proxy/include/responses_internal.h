@@ -50,8 +50,12 @@ typedef struct {
 
 size_t resp_buffer_write_cb(const char *data, size_t len, void *userdata);
 
-/* Strip tool_call XML blocks from text (defined in tools.c) */
+/* Strip tool_call XML blocks from text (defined in tools_parse.c) */
 char *resp_strip_tool_calls(const char *text);
+
+/* Code block extraction fallback (defined in tools_parse.c) */
+char *resp_extract_code_block_cmd(const char *text);
+void  resp_synthesize_tool_call(resp_result_t *result, const char *cmd);
 
 /* Route helpers (defined in route_helpers.c) */
 int  resp_parse_request(struct json_object *parsed, resp_request_t *req);
@@ -59,5 +63,13 @@ char *resp_build_openai_body(struct json_object *messages,
                               const char *model, const resp_request_t *rr);
 char *resp_build_nonstream_response(const resp_result_t *r,
                                      const char *model);
+
+/* Tool retry + SSE emission helpers (defined in route_helpers.c) */
+int  resp_tool_request_with_retry(struct json_object *messages,
+                                   const char *model, const char *cookie,
+                                   const resp_request_t *rr,
+                                   resp_result_t *result);
+void resp_emit_tool_result_sse(int fd, resp_result_t *result,
+                                const char *model);
 
 #endif /* UVA_PROXY_RESPONSES_INTERNAL_H */

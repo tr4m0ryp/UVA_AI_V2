@@ -1,6 +1,7 @@
 #include "server.h"
 #include "upstream.h"
 #include "translator.h"
+#include "think_parser.h"
 #include "stream.h"
 #include "apikey.h"
 #include "database.h"
@@ -29,26 +30,37 @@ typedef struct {
     const char      *model;
     char            *completion_id;
     stream_parser_t *parser;
+    think_parser_t  *think;
     buffer_t         accum; /* for non-streaming: accumulate full response */
     int              streaming;
-    int              completion_chars; /* rough char count for token estimate */
+    int              completion_chars;
 } chat_stream_ctx_t;
+
+/* Called by think_parser when it has classified a piece of text. */
+static void on_think_emit(const char *text, int is_reasoning, void *userdata)
+{
+    chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
+    ctx->completion_chars += (int)strlen(text);
+
+    struct json_object *obj = json_object_new_object();
+    json_object_object_add(obj, "type",
+        json_object_new_string(is_reasoning ? "thinking" : "content"));
+    json_object_object_add(obj, "text",
+        json_object_new_string(text));
+    const char *str = json_object_to_json_string_ext(obj,
+        JSON_C_TO_STRING_PLAIN);
+    response_send_sse_data(ctx->client_fd, str);
+    json_object_put(obj);
+}
 
 static void on_token(const char *token, void *userdata)
 {
     chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
 
-    ctx->completion_chars += (int)strlen(token);
-
     if (ctx->streaming) {
-        char *chunk = translate_stream_chunk(token, ctx->model,
-                                             ctx->completion_id,
-                                             0);
-        if (chunk) {
-            response_send_sse_data(ctx->client_fd, chunk);
-            free(chunk);
-        }
+        think_parser_feed(ctx->think, token);
     } else {
+        ctx->completion_chars += (int)strlen(token);
         buffer_append(&ctx->accum, token, strlen(token));
     }
 }
@@ -216,6 +228,7 @@ void handle_chat_completions(http_request_t *req)
     ctx.streaming = streaming;
     buffer_init(&ctx.accum);
     ctx.parser = stream_parser_new(on_token, &ctx);
+    ctx.think = streaming ? think_parser_new(on_think_emit, &ctx) : NULL;
 
     if (!ctx.parser) {
         free(uva_body);
@@ -232,9 +245,13 @@ void handle_chat_completions(http_request_t *req)
         resolved_key.user_session, upstream_stream_cb, &ctx, &resp_buf);
     free(uva_body);
 
-    /* Flush parser */
+    /* Flush parsers */
     stream_parser_finish(ctx.parser);
     stream_parser_free(ctx.parser);
+    if (ctx.think) {
+        think_parser_finish(ctx.think);
+        think_parser_free(ctx.think);
+    }
 
     if (http_code < 0 || http_code >= 500) {
         if (!streaming) {
@@ -248,22 +265,23 @@ void handle_chat_completions(http_request_t *req)
     }
 
     if (streaming) {
-        char *stop = translate_stream_chunk(NULL, model_buf, cid, 0);
-        if (stop) {
-            response_send_sse_data(req->client_fd, stop);
-            free(stop);
-        }
         response_end_sse(req->client_fd);
     } else {
-        char *resp_json = translate_response(
-            ctx.accum.data ? ctx.accum.data : "", model_buf, cid);
-        if (resp_json) {
-            response_send_json(req->client_fd, 200, resp_json);
-            free(resp_json);
-        } else {
-            response_send_error(req->client_fd, 500,
-                "Failed to build response");
-        }
+        char *reasoning = NULL;
+        char *clean = think_strip(
+            ctx.accum.data ? ctx.accum.data : "", &reasoning);
+        struct json_object *resp = json_object_new_object();
+        json_object_object_add(resp, "thinking",
+            json_object_new_string(
+                reasoning && *reasoning ? reasoning : ""));
+        json_object_object_add(resp, "content",
+            json_object_new_string(clean ? clean : ""));
+        const char *str = json_object_to_json_string_ext(resp,
+            JSON_C_TO_STRING_PLAIN);
+        response_send_json(req->client_fd, 200, str);
+        json_object_put(resp);
+        free(clean);
+        free(reasoning);
     }
 
     /* Log usage: estimate tokens from character count (~4 chars/token) */
