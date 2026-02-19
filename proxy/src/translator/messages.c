@@ -203,29 +203,6 @@ char *translate_request(const char *openai_body, const char *thread_id)
 
     const char *str = json_object_to_json_string_ext(uva,
         JSON_C_TO_STRING_PLAIN);
-
-    /* Debug: log the final message role and content length */
-    if (last_msg) {
-        struct json_object *dbg_r, *dbg_c;
-        if (json_object_object_get_ex(last_msg, "role", &dbg_r) &&
-            json_object_object_get_ex(last_msg, "content", &dbg_c)) {
-            const char *dc = json_object_get_string(dbg_c);
-            fprintf(stderr, "  [translator] final msg role=%s len=%zu\n",
-                    json_object_get_string(dbg_r),
-                    dc ? strlen(dc) : 0);
-            /* First 200 chars */
-            if (dc && strlen(dc) > 0) {
-                char preview[201];
-                size_t pl = strlen(dc);
-                if (pl > 200) pl = 200;
-                memcpy(preview, dc, pl);
-                preview[pl] = '\0';
-                fprintf(stderr, "  [translator] content start: %.200s\n",
-                        preview);
-            }
-        }
-    }
-
     char *result = strdup(str);
 
     json_object_put(uva);
