@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UvA Proxy Dashboard</title>
+    <title>UVA AI</title>
+    <link rel="manifest" href="/dashboard/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/dashboard/img/uva-logo.svg">
+    <link rel="apple-touch-icon" href="/dashboard/img/icon-192.png">
+    <meta name="theme-color" content="#bc0031">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -78,7 +82,6 @@
                     <div id="sidebar-user" class="sidebar-user"></div>
                 </div>
                 <button id="btn-logout" class="btn btn-sm">Logout</button>
-                <button id="btn-quit" class="btn-quit hidden">Quit</button>
             </div>
         </aside>
 
@@ -92,15 +95,129 @@
                 <div id="overview-grid" class="overview-grid"></div>
             </div>
 
-            <!-- API Keys view -->
+            <!-- API Keys view (list + detail) -->
             <div id="view-keys" class="view hidden">
-                <div class="view-header">
-                    <h2>API Keys</h2>
-                    <button id="btn-create-key" class="btn btn-primary">Create Key</button>
+                <!-- Keys List Sub-view -->
+                <div id="keys-list-view">
+                    <div class="view-header">
+                        <h2>API Keys</h2>
+                        <button id="btn-create-key" class="btn btn-primary">Create Key</button>
+                    </div>
+                    <div class="keys-container">
+                        <div id="keys-table-wrap" class="keys-table-wrap hidden">
+                            <table class="keys-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Model</th>
+                                        <th>Status</th>
+                                        <th class="hide-mobile">Created</th>
+                                        <th class="hide-mobile">Last Used</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="keys-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="keys-guide" class="keys-guide hidden">
+                        <div class="guide-header" id="guide-toggle">
+                            <span class="material-symbols-outlined">integration_instructions</span>
+                            <h3>Quick Start Guide</h3>
+                            <span class="material-symbols-outlined guide-chevron">expand_more</span>
+                        </div>
+                        <div id="guide-content" class="guide-content hidden">
+                            <div class="guide-endpoint-card">
+                                <div class="guide-endpoint-row">
+                                    <span class="guide-endpoint-label">Base URL</span>
+                                    <code id="guide-base-url"></code>
+                                </div>
+                                <div class="guide-endpoint-row">
+                                    <span class="guide-endpoint-label">Endpoints</span>
+                                    <code>/v1/chat/completions</code> <code>/v1/responses</code> <code>/v1/models</code>
+                                </div>
+                            </div>
+                            <div class="guide-tabs">
+                                <button class="guide-tab active" data-guide-tab="codex">Codex CLI</button>
+                                <button class="guide-tab" data-guide-tab="vscode">VS Code</button>
+                                <button class="guide-tab" data-guide-tab="curl">curl</button>
+                                <button class="guide-tab" data-guide-tab="python">Python</button>
+                            </div>
+                            <div class="guide-tab-panels">
+                                <div class="guide-panel" data-guide-panel="codex">
+                                    <p class="guide-desc">Install <a href="https://github.com/openai/codex" target="_blank">Codex CLI</a> and configure it to use this proxy.</p>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">~/.codex/config.toml</div>
+                                        <pre class="guide-code" id="guide-codex-config"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-codex-config">Copy</button>
+                                    </div>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">Environment variable</div>
+                                        <pre class="guide-code" id="guide-codex-env"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-codex-env">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="guide-panel hidden" data-guide-panel="vscode">
+                                    <p class="guide-desc">Use <a href="https://continue.dev" target="_blank">Continue.dev</a> extension for VS Code, or the customOAIModels setting in VS Code Insiders.</p>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">Continue.dev ~/.continue/config.yaml</div>
+                                        <pre class="guide-code" id="guide-continue-config"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-continue-config">Copy</button>
+                                    </div>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">VS Code Insiders settings.json</div>
+                                        <pre class="guide-code" id="guide-vscode-config"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-vscode-config">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="guide-panel hidden" data-guide-panel="curl">
+                                    <p class="guide-desc">Standard OpenAI-compatible API calls.</p>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">Chat Completions (streaming)</div>
+                                        <pre class="guide-code" id="guide-curl-chat"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-curl-chat">Copy</button>
+                                    </div>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">List Models</div>
+                                        <pre class="guide-code" id="guide-curl-models"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-curl-models">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="guide-panel hidden" data-guide-panel="python">
+                                    <p class="guide-desc">Use the official OpenAI Python SDK with a custom base URL.</p>
+                                    <div class="guide-code-wrap">
+                                        <div class="guide-code-label">Python (openai SDK)</div>
+                                        <pre class="guide-code" id="guide-python-code"></pre>
+                                        <button class="guide-copy-btn" data-copy-target="guide-python-code">Copy</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="keys-empty" class="empty-state hidden">
+                        <p>No API keys yet. Create one to get started.</p>
+                    </div>
                 </div>
-                <div id="keys-grid" class="keys-grid"></div>
-                <div id="keys-empty" class="empty-state hidden">
-                    <p>No API keys yet. Create one to get started.</p>
+                <!-- Key Detail Sub-view -->
+                <div id="keys-detail-view" class="hidden">
+                    <div class="key-detail-container">
+                        <button id="key-detail-back" class="key-detail-back">
+                            <span class="material-symbols-outlined">arrow_back</span>
+                            Back to API Keys
+                        </button>
+                        <div id="key-detail-header" class="key-detail-header"></div>
+                        <h3 style="margin: 20px 0 12px; font-size: 16px;">Usage Statistics</h3>
+                        <div id="usage-stats-grid" class="usage-stats-grid"></div>
+                        <div id="usage-chart-card" class="usage-chart-card">
+                            <div class="usage-chart-title">Daily Token Usage (Last 30 Days)</div>
+                            <div id="usage-chart" class="usage-chart"></div>
+                            <div class="usage-chart-legend">
+                                <div class="usage-legend-item"><span class="usage-legend-dot prompt"></span> Prompt</div>
+                                <div class="usage-legend-item"><span class="usage-legend-dot completion"></span> Completion</div>
+                            </div>
+                        </div>
+                        <div id="usage-empty" class="usage-empty hidden">No usage data yet. Start making requests with this key.</div>
+                    </div>
                 </div>
             </div>
 
@@ -135,14 +252,9 @@
                 <iframe id="chat-iframe" class="chat-iframe" frameborder="0" allowfullscreen></iframe>
             </div>
 
-            <!-- Cloud Coding view (placeholder) -->
-            <div id="view-coding" class="view hidden">
-                <div class="view-header">
-                    <h2>Cloud Coding</h2>
-                </div>
-                <div class="empty-state">
-                    <p>Cloud coding environment is under development.</p>
-                </div>
+            <!-- Cloud Coding view -->
+            <div id="view-coding" class="view view-coding hidden">
+                <iframe id="coding-iframe" class="coding-iframe" frameborder="0" allowfullscreen></iframe>
             </div>
         </div>
     </div>

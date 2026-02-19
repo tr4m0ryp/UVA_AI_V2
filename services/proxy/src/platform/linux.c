@@ -109,6 +109,7 @@ int platform_open_app_window(const char *url)
     char cmd[2048];
     snprintf(cmd, sizeof(cmd),
              "'%s' --app='%s' --user-data-dir='%s' "
+             "--class='uva-ai' "
              "--no-first-run --disable-default-apps "
              ">/dev/null 2>&1 &",
              chrome, url, profile_dir);

@@ -56,36 +56,26 @@ void response_start_sse(int fd)
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/event-stream\r\n"
         "Cache-Control: no-cache\r\n"
-        "Connection: keep-alive\r\n"
+        "Connection: close\r\n"
         "Access-Control-Allow-Origin: *\r\n"
         "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
         "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
-        "Transfer-Encoding: chunked\r\n"
         "\r\n";
     platform_send(fd, header, strlen(header));
 }
 
 void response_send_sse_data(int fd, const char *data)
 {
-    /* chunked transfer encoding */
     char line[8192];
     int len = snprintf(line, sizeof(line), "data: %s\n\n", data);
-    char chunk[8320];
-    int clen = snprintf(chunk, sizeof(chunk), "%x\r\n%s\r\n", len, line);
-    platform_send(fd, chunk, (size_t)clen);
+    platform_send(fd, line, (size_t)len);
 }
 
 void response_end_sse(int fd)
 {
-    /* Send [DONE] and final chunk */
     const char *done = "data: [DONE]\n\n";
-    char chunk[128];
-    int clen = snprintf(chunk, sizeof(chunk), "%x\r\n%s\r\n",
-                        (int)strlen(done), done);
-    platform_send(fd, chunk, (size_t)clen);
-
-    /* Terminating chunk */
-    platform_send(fd, "0\r\n\r\n", 5);
+    platform_send(fd, done, strlen(done));
+    (void)fd; /* connection will be closed by caller */
 }
 
 /* Declaration for external use */

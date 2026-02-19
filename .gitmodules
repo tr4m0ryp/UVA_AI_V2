@@ -1,0 +1,6 @@
+[submodule "vendor/open-webui"]
+	path = vendor/open-webui
+	url = https://github.com/open-webui/open-webui.git
+[submodule "vendor/opencode-web"]
+	path = vendor/opencode-web
+	url = https://github.com/chris-tse/opencode-web.git

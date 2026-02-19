@@ -36,7 +36,22 @@ static const char *SCHEMA_SQL =
     "  created_at TEXT DEFAULT (datetime('now')),"
     "  last_used TEXT,"
     "  is_active INTEGER DEFAULT 1"
-    ");";
+    ");"
+    "CREATE TABLE IF NOT EXISTS request_logs ("
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  api_key_id INTEGER NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,"
+    "  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,"
+    "  model TEXT NOT NULL,"
+    "  prompt_tokens INTEGER DEFAULT 0,"
+    "  completion_tokens INTEGER DEFAULT 0,"
+    "  total_tokens INTEGER DEFAULT 0,"
+    "  status INTEGER DEFAULT 200,"
+    "  created_at TEXT DEFAULT (datetime('now'))"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_request_logs_key "
+    "  ON request_logs(api_key_id);"
+    "CREATE INDEX IF NOT EXISTS idx_request_logs_created "
+    "  ON request_logs(created_at);";
 
 int db_init(const char *path)
 {

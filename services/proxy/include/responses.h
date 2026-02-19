@@ -25,6 +25,7 @@ typedef struct {
     char *full_text;            /* accumulated text (caller frees) */
     int   tool_call_count;
     resp_tool_call_t tool_calls[RESP_MAX_TOOL_CALLS];
+    int   seq;                  /* SSE sequence_number counter */
 } resp_result_t;
 
 typedef struct {

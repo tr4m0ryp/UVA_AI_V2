@@ -2,7 +2,7 @@
 var Dashboard = Dashboard || {};
 
 Dashboard.app = (function() {
-    /* Detect Chrome --app mode (no URL bar, standalone display mode) */
+    /* Detect standalone/installed app mode (Chrome --app or PWA install) */
     var isAppMode = window.matchMedia('(display-mode: standalone)').matches ||
                     window.navigator.standalone === true;
 
@@ -10,16 +10,24 @@ Dashboard.app = (function() {
         if (!isAppMode) return;
         document.body.classList.add('app-mode');
 
-        var quitBtn = document.getElementById('btn-quit');
-        if (quitBtn) {
-            quitBtn.classList.remove('hidden');
-            quitBtn.addEventListener('click', function() {
-                if (confirm('Shut down uva-proxy?')) {
-                    fetch('/api/dashboard/shutdown', { method: 'POST' })
-                        .finally(function() { window.close(); });
-                }
+        /* When the user closes the window (X button), shut down the proxy.
+         * sendBeacon is reliable during page unload -- fetch is not. */
+        window.addEventListener('beforeunload', function() {
+            navigator.sendBeacon('/api/dashboard/shutdown');
+        });
+    }
+
+    function loadServiceIframe(iframeId, url, serviceName, setupHint) {
+        var frame = document.getElementById(iframeId);
+        if (!frame || frame.src) return;
+        fetch(url, { mode: 'no-cors' })
+            .then(function() { frame.src = url; })
+            .catch(function() {
+                frame.parentElement.innerHTML =
+                    '<div class="service-offline">' +
+                    '<h3>' + serviceName + ' is not running</h3>' +
+                    '<p>' + setupHint + '</p></div>';
             });
-        }
     }
 
     function init() {
@@ -48,15 +56,14 @@ Dashboard.app = (function() {
         });
         Dashboard.router.register('chat', {
             mount: function() {
-                var frame = document.getElementById('chat-iframe');
-                if (frame && !frame.src) {
-                    frame.src = 'http://127.0.0.1:5173';
-                }
+                loadServiceIframe('chat-iframe', 'http://127.0.0.1:5173',
+                    'Chat Interface', 'Run ./start-all.sh to launch all services including Open WebUI.');
             }
         });
         Dashboard.router.register('coding', {
             mount: function() {
-                window.location.href = 'http://127.0.0.1:5174';
+                loadServiceIframe('coding-iframe', 'http://127.0.0.1:5174',
+                    'Cloud Coding', 'Run ./start-all.sh to launch all services including opencode-web.');
             }
         });
 

@@ -19,7 +19,7 @@ void resp_gen_id(char *buf, const char *prefix, int hex_len)
     buf[pos] = '\0';
 }
 
-/* Send one Responses API SSE event inside chunked transfer encoding.
+/* Send one Responses API SSE event.
  * Format: "event: TYPE\ndata: JSON\n\n" */
 void resp_send_sse_event(int fd, const char *event_type,
                          const char *json_data)
@@ -27,9 +27,7 @@ void resp_send_sse_event(int fd, const char *event_type,
     char line[16384];
     int len = snprintf(line, sizeof(line),
         "event: %s\ndata: %s\n\n", event_type, json_data);
-    char chunk[16512];
-    int clen = snprintf(chunk, sizeof(chunk), "%x\r\n%s\r\n", len, line);
-    platform_send(fd, chunk, (size_t)clen);
+    platform_send(fd, line, (size_t)len);
 }
 
 struct json_object *resp_build_skeleton(const resp_result_t *r,
@@ -49,6 +47,11 @@ struct json_object *resp_build_skeleton(const resp_result_t *r,
         json_object_new_string(model));
     json_object_object_add(obj, "output",
         json_object_new_array());
+    json_object_object_add(obj, "parallel_tool_calls",
+        json_object_new_boolean(1));
+    json_object_object_add(obj, "usage", NULL);
+    json_object_object_add(obj, "metadata",
+        json_object_new_object());
     return obj;
 }
 
@@ -75,6 +78,8 @@ struct json_object *resp_build_message_item(const resp_result_t *r,
             json_object_new_string("output_text"));
         json_object_object_add(part, "text",
             json_object_new_string(text));
+        json_object_object_add(part, "annotations",
+            json_object_new_array());
         json_object_array_add(content, part);
     }
     json_object_object_add(item, "content", content);
@@ -102,78 +107,93 @@ struct json_object *resp_build_func_call_item(const resp_tool_call_t *tc,
     return item;
 }
 
+/* Helper: wrap data with type + sequence_number and emit */
+static void emit_event(int fd, resp_result_t *r, const char *event_type,
+                        struct json_object *data)
+{
+    r->seq++;
+    json_object_object_add(data, "type",
+        json_object_new_string(event_type));
+    json_object_object_add(data, "sequence_number",
+        json_object_new_int(r->seq));
+    const char *s = json_object_to_json_string_ext(data,
+        JSON_C_TO_STRING_PLAIN);
+    resp_send_sse_event(fd, event_type, s);
+    json_object_put(data);
+}
+
 void resp_emit_created(int fd, const resp_result_t *r, const char *model)
 {
-    struct json_object *obj = resp_build_skeleton(r, model, "in_progress");
-    const char *s = json_object_to_json_string_ext(obj,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.created", s);
-    json_object_put(obj);
+    resp_result_t *mr = (resp_result_t *)r; /* for seq increment */
+    struct json_object *resp = resp_build_skeleton(r, model, "in_progress");
+    struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "response", resp);
+    emit_event(fd, mr, "response.created", ev);
 }
 
 void resp_emit_output_item_added(int fd, const resp_result_t *r,
                                  const char *model)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *item = resp_build_message_item(r, model,
                                                        NULL, "in_progress");
     struct json_object *ev = json_object_new_object();
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "item", item);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_item.added", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_item.added", ev);
 }
 
 void resp_emit_content_part_added(int fd, const resp_result_t *r)
 {
-    (void)r;
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->msg_id));
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "content_index", json_object_new_int(0));
     struct json_object *part = json_object_new_object();
     json_object_object_add(part, "type",
         json_object_new_string("output_text"));
     json_object_object_add(part, "text", json_object_new_string(""));
+    json_object_object_add(part, "annotations",
+        json_object_new_array());
     json_object_object_add(ev, "part", part);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.content_part.added", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.content_part.added", ev);
 }
 
 void resp_emit_text_delta(int fd, const resp_result_t *r,
                           const char *delta)
 {
-    (void)r;
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->msg_id));
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "content_index", json_object_new_int(0));
     json_object_object_add(ev, "delta",
         json_object_new_string(delta));
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_text.delta", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_text.delta", ev);
 }
 
 void resp_emit_text_done(int fd, const resp_result_t *r)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->msg_id));
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "content_index", json_object_new_int(0));
     json_object_object_add(ev, "text",
         json_object_new_string(r->full_text ? r->full_text : ""));
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_text.done", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_text.done", ev);
 }
 
 void resp_emit_content_part_done(int fd, const resp_result_t *r)
 {
-    (void)r;
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->msg_id));
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "content_index", json_object_new_int(0));
     struct json_object *part = json_object_new_object();
@@ -181,35 +201,33 @@ void resp_emit_content_part_done(int fd, const resp_result_t *r)
         json_object_new_string("output_text"));
     json_object_object_add(part, "text",
         json_object_new_string(r->full_text ? r->full_text : ""));
+    json_object_object_add(part, "annotations",
+        json_object_new_array());
     json_object_object_add(ev, "part", part);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.content_part.done", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.content_part.done", ev);
 }
 
 void resp_emit_output_item_done(int fd, const resp_result_t *r,
                                 const char *model)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *item = resp_build_message_item(r, model,
         r->full_text ? r->full_text : "", "completed");
     struct json_object *ev = json_object_new_object();
     json_object_object_add(ev, "output_index", json_object_new_int(0));
     json_object_object_add(ev, "item", item);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_item.done", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_item.done", ev);
 }
 
 void resp_emit_completed(int fd, const resp_result_t *r,
                          const char *model)
 {
-    struct json_object *obj = resp_build_skeleton(r, model, "completed");
+    resp_result_t *mr = (resp_result_t *)r;
+    struct json_object *resp = resp_build_skeleton(r, model, "completed");
 
     /* Fill output array based on result type */
     struct json_object *output;
-    json_object_object_get_ex(obj, "output", &output);
+    json_object_object_get_ex(resp, "output", &output);
 
     if (r->tool_call_count > 0) {
         for (int i = 0; i < r->tool_call_count; i++) {
@@ -223,66 +241,72 @@ void resp_emit_completed(int fd, const resp_result_t *r,
         json_object_array_add(output, item);
     }
 
-    const char *s = json_object_to_json_string_ext(obj,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.completed", s);
-    json_object_put(obj);
+    /* Add usage */
+    struct json_object *usage = json_object_new_object();
+    json_object_object_add(usage, "input_tokens",
+        json_object_new_int(0));
+    json_object_object_add(usage, "output_tokens",
+        json_object_new_int(0));
+    json_object_object_add(usage, "total_tokens",
+        json_object_new_int(0));
+    json_object_object_del(resp, "usage");
+    json_object_object_add(resp, "usage", usage);
+
+    struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "response", resp);
+    emit_event(fd, mr, "response.completed", ev);
 }
 
 void resp_emit_func_call_added(int fd, const resp_result_t *r,
                                int idx, const char *model)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *item = resp_build_func_call_item(
         &r->tool_calls[idx], model, "in_progress");
     struct json_object *ev = json_object_new_object();
     json_object_object_add(ev, "output_index",
         json_object_new_int(idx));
     json_object_object_add(ev, "item", item);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_item.added", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_item.added", ev);
 }
 
 void resp_emit_func_call_args_delta(int fd, const resp_result_t *r,
                                     int idx)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->tool_calls[idx].call_id));
     json_object_object_add(ev, "output_index",
         json_object_new_int(idx));
     json_object_object_add(ev, "delta",
         json_object_new_string(r->tool_calls[idx].arguments));
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.function_call_arguments.delta", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.function_call_arguments.delta", ev);
 }
 
 void resp_emit_func_call_args_done(int fd, const resp_result_t *r,
                                    int idx)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *ev = json_object_new_object();
+    json_object_object_add(ev, "item_id",
+        json_object_new_string(r->tool_calls[idx].call_id));
     json_object_object_add(ev, "output_index",
         json_object_new_int(idx));
     json_object_object_add(ev, "arguments",
         json_object_new_string(r->tool_calls[idx].arguments));
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.function_call_arguments.done", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.function_call_arguments.done", ev);
 }
 
 void resp_emit_func_call_item_done(int fd, const resp_result_t *r,
                                    int idx, const char *model)
 {
+    resp_result_t *mr = (resp_result_t *)r;
     struct json_object *item = resp_build_func_call_item(
         &r->tool_calls[idx], model, "completed");
     struct json_object *ev = json_object_new_object();
     json_object_object_add(ev, "output_index",
         json_object_new_int(idx));
     json_object_object_add(ev, "item", item);
-    const char *s = json_object_to_json_string_ext(ev,
-        JSON_C_TO_STRING_PLAIN);
-    resp_send_sse_event(fd, "response.output_item.done", s);
-    json_object_put(ev);
+    emit_event(fd, mr, "response.output_item.done", ev);
 }

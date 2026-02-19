@@ -132,6 +132,10 @@ int resp_handle_tool_path(int fd, const char *uva_body,
                           const char *cookie, const char *model,
                           resp_result_t *result)
 {
+    /* Emit response.created immediately so the client knows the
+     * stream is alive while we buffer the upstream response. */
+    resp_emit_created(fd, result, model);
+
     buffer_t accum;
     buffer_init(&accum);
 
@@ -165,9 +169,6 @@ int resp_handle_tool_path(int fd, const char *uva_body,
     /* Try to parse tool calls from model output */
     resp_tool_call_t calls[RESP_MAX_TOOL_CALLS];
     int n = resp_parse_tool_calls(full_text, calls, RESP_MAX_TOOL_CALLS);
-
-    /* Emit response.created */
-    resp_emit_created(fd, result, model);
 
     if (n > 0) {
         /* Tool calls found */

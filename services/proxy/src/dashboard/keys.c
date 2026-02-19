@@ -37,6 +37,10 @@ static struct json_object *key_to_json(const db_api_key_t *k)
         json_object_new_string(k->system_prompt));
     json_object_object_add(obj, "is_active",
         json_object_new_boolean(k->is_active));
+    json_object_object_add(obj, "created_at",
+        json_object_new_string(k->created_at));
+    json_object_object_add(obj, "last_used",
+        json_object_new_string(k->last_used[0] ? k->last_used : ""));
     return obj;
 }
 
@@ -234,4 +238,60 @@ void dashboard_keys_toggle(http_request_t *req, const db_user_t *user,
         return;
     }
     response_send_json(req->client_fd, 200, "{\"ok\":true}");
+}
+
+void dashboard_keys_usage(http_request_t *req, const db_user_t *user,
+                          int64_t key_id)
+{
+    (void)req;
+
+    /* Get summary */
+    db_usage_summary_t summary;
+    if (db_key_usage_summary(key_id, user->id, &summary) != 0) {
+        response_send_error(req->client_fd, 500, "Failed to get usage");
+        return;
+    }
+
+    /* Get daily breakdown (last 30 days) */
+    db_usage_day_t *days = NULL;
+    int day_count = 0;
+    db_key_usage_daily(key_id, user->id, 30, &days, &day_count);
+
+    struct json_object *resp = json_object_new_object();
+
+    /* Summary */
+    struct json_object *sum = json_object_new_object();
+    json_object_object_add(sum, "total_requests",
+        json_object_new_int(summary.total_requests));
+    json_object_object_add(sum, "prompt_tokens",
+        json_object_new_int(summary.prompt_tokens));
+    json_object_object_add(sum, "completion_tokens",
+        json_object_new_int(summary.completion_tokens));
+    json_object_object_add(sum, "total_tokens",
+        json_object_new_int(summary.total_tokens));
+    json_object_object_add(resp, "summary", sum);
+
+    /* Daily array */
+    struct json_object *arr = json_object_new_array();
+    for (int i = 0; i < day_count; i++) {
+        struct json_object *d = json_object_new_object();
+        json_object_object_add(d, "date",
+            json_object_new_string(days[i].date));
+        json_object_object_add(d, "requests",
+            json_object_new_int(days[i].total_requests));
+        json_object_object_add(d, "prompt_tokens",
+            json_object_new_int(days[i].prompt_tokens));
+        json_object_object_add(d, "completion_tokens",
+            json_object_new_int(days[i].completion_tokens));
+        json_object_object_add(d, "total_tokens",
+            json_object_new_int(days[i].total_tokens));
+        json_object_array_add(arr, d);
+    }
+    json_object_object_add(resp, "daily", arr);
+    free(days);
+
+    const char *str = json_object_to_json_string_ext(resp,
+        JSON_C_TO_STRING_PLAIN);
+    response_send_json(req->client_fd, 200, str);
+    json_object_put(resp);
 }

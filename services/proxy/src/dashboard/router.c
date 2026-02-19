@@ -28,6 +28,8 @@ void dashboard_keys_delete(http_request_t *req, const db_user_t *user,
                            int64_t key_id);
 void dashboard_keys_toggle(http_request_t *req, const db_user_t *user,
                            int64_t key_id);
+void dashboard_keys_usage(http_request_t *req, const db_user_t *user,
+                          int64_t key_id);
 
 static int authenticate_dashboard(http_request_t *req, db_user_t *user)
 {
@@ -113,6 +115,17 @@ void dashboard_handle(http_request_t *req)
         int64_t kid = extract_path_id(path, "/api/dashboard/keys");
         if (kid > 0)
             dashboard_keys_toggle(req, &user, kid);
+        else
+            response_send_error(req->client_fd, 400, "Invalid key ID");
+        return;
+    }
+
+    /* /api/dashboard/keys/{id}/usage */
+    if (strncmp(path, "/api/dashboard/keys/", 20) == 0 &&
+        strstr(path, "/usage")) {
+        int64_t kid = extract_path_id(path, "/api/dashboard/keys");
+        if (kid > 0)
+            dashboard_keys_usage(req, &user, kid);
         else
             response_send_error(req->client_fd, 400, "Invalid key ID");
         return;

@@ -3,6 +3,7 @@
 #include "translator.h"
 #include "stream.h"
 #include "apikey.h"
+#include "database.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,20 +28,22 @@ typedef struct {
     int              client_fd;
     const char      *model;
     char            *completion_id;
-    int              chunk_index;
     stream_parser_t *parser;
     buffer_t         accum; /* for non-streaming: accumulate full response */
     int              streaming;
+    int              completion_chars; /* rough char count for token estimate */
 } chat_stream_ctx_t;
 
 static void on_token(const char *token, void *userdata)
 {
     chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
 
+    ctx->completion_chars += (int)strlen(token);
+
     if (ctx->streaming) {
         char *chunk = translate_stream_chunk(token, ctx->model,
                                              ctx->completion_id,
-                                             ctx->chunk_index++);
+                                             0);
         if (chunk) {
             response_send_sse_data(ctx->client_fd, chunk);
             free(chunk);
@@ -132,38 +135,31 @@ void handle_chat_completions(http_request_t *req)
         return;
     }
 
-    /* Check for API key in Authorization header */
+    /* Authenticate via API key (mandatory) */
     db_api_key_t resolved_key;
-    int has_apikey = 0;
     const char *auth = request_get_header(req, "Authorization");
-    if (auth) {
-        const char *key = apikey_extract(auth);
-        if (key) {
-            if (apikey_resolve(key, &resolved_key) == 0) {
-                has_apikey = 1;
-                fprintf(stderr, "  Using API key: %s (model: %s)\n",
-                        resolved_key.key_prefix, resolved_key.model);
-            } else {
-                response_send_error(req->client_fd, 401,
-                    "Invalid or inactive API key");
-                return;
-            }
-        }
+    if (!auth) {
+        response_send_error(req->client_fd, 401, "Authorization required");
+        return;
     }
 
-    /* Prepare request body: apply API key overrides if present */
-    char *effective_body;
+    const char *key = apikey_extract(auth);
+    if (!key || apikey_resolve(key, &resolved_key) != 0) {
+        response_send_error(req->client_fd, 401,
+            "Invalid or inactive API key");
+        return;
+    }
+
+    fprintf(stderr, "  [chat] API key: %s (model: %s)\n",
+            resolved_key.key_prefix, resolved_key.model);
+
+    /* Prepare request body: apply API key overrides */
     char model_buf[DB_MAX_MODEL];
-    if (has_apikey) {
-        effective_body = apply_apikey_overrides(req->body, &resolved_key,
-                                                model_buf, sizeof(model_buf));
-        if (!effective_body) {
-            response_send_error(req->client_fd, 400, "Invalid JSON");
-            return;
-        }
-    } else {
-        effective_body = strdup(req->body);
-        snprintf(model_buf, sizeof(model_buf), "unknown");
+    char *effective_body = apply_apikey_overrides(req->body, &resolved_key,
+                                                  model_buf, sizeof(model_buf));
+    if (!effective_body) {
+        response_send_error(req->client_fd, 400, "Invalid JSON");
+        return;
     }
 
     /* Parse to check for stream flag and model */
@@ -178,13 +174,6 @@ void handle_chat_completions(http_request_t *req)
     struct json_object *stream_obj;
     if (json_object_object_get_ex(parsed, "stream", &stream_obj))
         streaming = json_object_get_boolean(stream_obj);
-
-    if (!has_apikey) {
-        struct json_object *model_obj;
-        if (json_object_object_get_ex(parsed, "model", &model_obj))
-            snprintf(model_buf, sizeof(model_buf), "%s",
-                     json_object_get_string(model_obj));
-    }
 
     json_object_put(parsed);
 
@@ -219,7 +208,6 @@ void handle_chat_completions(http_request_t *req)
     ctx.client_fd = req->client_fd;
     ctx.model = model_buf;
     ctx.completion_id = cid;
-    ctx.chunk_index = 0;
     ctx.streaming = streaming;
     buffer_init(&ctx.accum);
     ctx.parser = stream_parser_new(on_token, &ctx);
@@ -233,16 +221,10 @@ void handle_chat_completions(http_request_t *req)
     if (streaming)
         response_start_sse(req->client_fd);
 
-    /* Send to upstream: use user's cookie if API key, else global */
+    /* Send to upstream using the API key's session cookie */
     buffer_t resp_buf;
-    int http_code;
-    if (has_apikey) {
-        http_code = upstream_chat_with_cookie(uva_body, strlen(uva_body),
-            resolved_key.user_session, upstream_stream_cb, &ctx, &resp_buf);
-    } else {
-        http_code = upstream_chat(uva_body, strlen(uva_body),
-                                  upstream_stream_cb, &ctx, &resp_buf);
-    }
+    int http_code = upstream_chat_with_cookie(uva_body, strlen(uva_body),
+        resolved_key.user_session, upstream_stream_cb, &ctx, &resp_buf);
     free(uva_body);
 
     /* Flush parser */
@@ -261,8 +243,7 @@ void handle_chat_completions(http_request_t *req)
     }
 
     if (streaming) {
-        char *stop = translate_stream_chunk(NULL, model_buf, cid,
-                                            ctx.chunk_index);
+        char *stop = translate_stream_chunk(NULL, model_buf, cid, 0);
         if (stop) {
             response_send_sse_data(req->client_fd, stop);
             free(stop);
@@ -278,6 +259,14 @@ void handle_chat_completions(http_request_t *req)
             response_send_error(req->client_fd, 500,
                 "Failed to build response");
         }
+    }
+
+    /* Log usage: estimate tokens from character count (~4 chars/token) */
+    if (http_code >= 0 && http_code < 500) {
+        int est_prompt = (int)(req->body_len / 4);
+        int est_completion = ctx.completion_chars / 4;
+        db_log_request(resolved_key.id, resolved_key.user_id,
+                       model_buf, est_prompt, est_completion, http_code);
     }
 
     buffer_free(&ctx.accum);

@@ -46,7 +46,7 @@ echo "[start-all] Building and starting C proxy on :8787..."
 make -C "$PROXY_DIR" -j"$(nproc)" 2>&1
 (
     cd "$PROXY_DIR"
-    ./uva-proxy --port 8787
+    ./uva-proxy --port 8787 --headless
 ) &
 PIDS+=($!)
 echo "[start-all] C proxy started (pid ${PIDS[-1]})"

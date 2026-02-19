@@ -73,6 +73,17 @@ static void fill_key(sqlite3_stmt *stmt, db_api_key_t *out)
     if (s) snprintf(out->system_prompt, sizeof(out->system_prompt), "%s", s);
 
     out->is_active = sqlite3_column_int(stmt, 13);
+
+    /* Optional columns: created_at (14) and last_used (15) */
+    int ncol = sqlite3_column_count(stmt);
+    if (ncol > 14) {
+        s = (const char *)sqlite3_column_text(stmt, 14);
+        if (s) snprintf(out->created_at, sizeof(out->created_at), "%s", s);
+    }
+    if (ncol > 15) {
+        s = (const char *)sqlite3_column_text(stmt, 15);
+        if (s) snprintf(out->last_used, sizeof(out->last_used), "%s", s);
+    }
 }
 
 int db_key_find_by_hash(const char *hash, db_api_key_t *out)
@@ -112,7 +123,8 @@ int db_key_list_by_user(int64_t user_id, db_api_key_t **out, int *count)
     const char *sql =
         "SELECT id, user_id, key_hash, key_prefix, name, model, "
         "temperature, top_p, max_tokens, frequency_penalty, "
-        "presence_penalty, reasoning_effort, system_prompt, is_active "
+        "presence_penalty, reasoning_effort, system_prompt, is_active, "
+        "created_at, last_used "
         "FROM api_keys WHERE user_id = ?1 ORDER BY id DESC";
 
     sqlite3_stmt *stmt = NULL;

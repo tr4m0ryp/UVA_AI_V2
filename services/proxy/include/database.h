@@ -37,9 +37,26 @@ typedef struct {
     char    reasoning_effort[16];
     char    system_prompt[DB_MAX_PROMPT];
     int     is_active;
+    char    created_at[32];
+    char    last_used[32];
     /* resolved from JOIN */
     char    user_session[DB_MAX_COOKIE];
 } db_api_key_t;
+
+typedef struct {
+    int     total_requests;
+    int     prompt_tokens;
+    int     completion_tokens;
+    int     total_tokens;
+    char    date[11]; /* YYYY-MM-DD */
+} db_usage_day_t;
+
+typedef struct {
+    int     total_requests;
+    int     prompt_tokens;
+    int     completion_tokens;
+    int     total_tokens;
+} db_usage_summary_t;
 
 /* Initialize database. Creates schema if needed. Returns 0 on success. */
 int db_init(const char *path);
@@ -63,5 +80,13 @@ int db_key_update(int64_t key_id, int64_t user_id, const db_api_key_t *key);
 int db_key_delete(int64_t key_id, int64_t user_id);
 int db_key_toggle(int64_t key_id, int64_t user_id);
 int db_key_touch(int64_t key_id);
+
+/* Request logging */
+int db_log_request(int64_t api_key_id, int64_t user_id, const char *model,
+                   int prompt_tokens, int completion_tokens, int status);
+int db_key_usage_summary(int64_t key_id, int64_t user_id,
+                         db_usage_summary_t *out);
+int db_key_usage_daily(int64_t key_id, int64_t user_id, int days,
+                       db_usage_day_t **out, int *count);
 
 #endif /* UVA_PROXY_DATABASE_H */

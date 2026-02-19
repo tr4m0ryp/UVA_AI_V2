@@ -1,0 +1,27 @@
+{
+  "name": "UVA AI",
+  "short_name": "UVA AI",
+  "description": "UvA AI Chat Proxy -- OpenAI-compatible API gateway",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F5F5F3",
+  "theme_color": "#bc0031",
+  "icons": [
+    {
+      "src": "/dashboard/img/uva-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/dashboard/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/dashboard/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

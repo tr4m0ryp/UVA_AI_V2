@@ -204,6 +204,27 @@
     min-height: 0;
 }
 
+/* Cloud Coding view fills the full main content area */
+.view-coding {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.view-coding.hidden {
+    display: none !important;
+}
+
+.coding-iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    display: block;
+    min-height: 0;
+}
+
 /* View header (replaces .dashboard-header) */
 .view-header {
     display: flex;
@@ -331,23 +352,6 @@
     flex-shrink: 0;
 }
 .status-dot.offline { background: var(--danger); }
-
-/* Quit button (app-mode only) */
-.btn-quit {
-    padding: 6px 12px;
-    font-size: 12px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-.btn-quit:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
 
 /* Mobile responsive */
 @media (max-width: 768px) {
