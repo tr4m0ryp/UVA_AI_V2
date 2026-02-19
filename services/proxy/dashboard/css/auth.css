@@ -1,0 +1,44 @@
+.btn-browser {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-browser:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-browser:disabled { opacity: 0.6; cursor: not-allowed; }
+
+#browser-login-status {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.login-hint {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-top: 12px;
+}

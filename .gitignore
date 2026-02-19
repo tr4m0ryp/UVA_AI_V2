@@ -1,30 +1,49 @@
-# Dependencies
+# ─── Node / npm ───────────────────────────────────────────────────────────────
 node_modules/
-
-# Next.js build output
-.next/
-
-# TypeScript
+package-lock.json
 *.tsbuildinfo
 
-# Secrets / environment files
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ─── C build artifacts ────────────────────────────────────────────────────────
+services/proxy/build/
+services/proxy/uva-proxy
+
+# ─── Next.js build output ─────────────────────────────────────────────────────
+.next/
+
+# ─── Databases ────────────────────────────────────────────────────────────────
+services/proxy/proxy.db
+services/proxy/proxy.db-shm
+services/proxy/proxy.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# ─── Secrets / environment files ──────────────────────────────────────────────
+services/proxy/proxy.env
 *.env
 .env
 .env.*
 !.env.example
 
-# Databases
-*.db
-*.db-shm
-*.db-wal
+# ─── Captured traffic (potentially sensitive) ─────────────────────────────────
+upstream/capture/captured_traffic.json
+upstream/capture/capture_summary.txt
 
-# Upstream research artifacts (large, not part of the app)
-upstream/
+# ─── Source maps (extracted source already in upstream/extracted/) ─────────────
+upstream/bundles/*.map
 
-# Project instructions (local only)
-CLAUDE.md
+# ─── Prettified bundle duplicates ─────────────────────────────────────────────
+upstream/bundles/*_pretty.js
 
-# OS / editor
+# ─── Raw HTML captures (not real API docs) ────────────────────────────────────
+upstream/bundles/api_*.txt
+
+# ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .idea/
