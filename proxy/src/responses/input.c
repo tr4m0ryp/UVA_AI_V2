@@ -25,7 +25,11 @@ static const char *extract_text_from_parts(struct json_object *parts)
         if (!json_object_object_get_ex(part, "type", &type_obj))
             continue;
         const char *type = json_object_get_string(type_obj);
-        if (!type || strcmp(type, "text") != 0)
+        if (!type)
+            continue;
+        if (strcmp(type, "text") != 0 &&
+            strcmp(type, "input_text") != 0 &&
+            strcmp(type, "output_text") != 0)
             continue;
         if (!json_object_object_get_ex(part, "text", &text_obj))
             continue;
@@ -96,7 +100,21 @@ struct json_object *resp_input_to_messages(struct json_object *input,
             /* Check if it's a standard message with role */
             struct json_object *role_obj;
             if (json_object_object_get_ex(item, "role", &role_obj)) {
-                json_object_array_add(messages, json_object_get(item));
+                /* If content is an array, extract text from parts */
+                struct json_object *cnt;
+                if (json_object_object_get_ex(item, "content", &cnt) &&
+                    json_object_is_type(cnt, json_type_array)) {
+                    const char *r = json_object_get_string(role_obj);
+                    const char *txt = extract_text_from_parts(cnt);
+                    struct json_object *msg = json_object_new_object();
+                    json_object_object_add(msg, "role",
+                        json_object_new_string(r ? r : "user"));
+                    json_object_object_add(msg, "content",
+                        json_object_new_string(txt));
+                    json_object_array_add(messages, msg);
+                } else {
+                    json_object_array_add(messages, json_object_get(item));
+                }
                 continue;
             }
 
@@ -133,6 +151,32 @@ struct json_object *resp_input_to_messages(struct json_object *input,
                     json_object_new_string(c));
                 json_object_array_add(messages, msg);
 
+            } else if (strcmp(type, "function_call") == 0) {
+                /* Convert assistant's prior tool call to a message so
+                 * the model sees what it previously requested. */
+                struct json_object *fn_obj, *args_obj, *cid_obj;
+                const char *fn = "unknown";
+                const char *args = "";
+                const char *cid = "";
+                if (json_object_object_get_ex(item, "name", &fn_obj))
+                    fn = json_object_get_string(fn_obj);
+                if (json_object_object_get_ex(item, "arguments", &args_obj))
+                    args = json_object_get_string(args_obj);
+                if (json_object_object_get_ex(item, "call_id", &cid_obj))
+                    cid = json_object_get_string(cid_obj);
+
+                char content[RESP_MAX_ARGS + 512];
+                snprintf(content, sizeof(content),
+                    "[Called tool \"%s\" (call_id: %s) with arguments: %s]",
+                    fn, cid, args);
+
+                struct json_object *msg = json_object_new_object();
+                json_object_object_add(msg, "role",
+                    json_object_new_string("assistant"));
+                json_object_object_add(msg, "content",
+                    json_object_new_string(content));
+                json_object_array_add(messages, msg);
+
             } else if (strcmp(type, "function_call_output") == 0) {
                 /* Kept for resp_fold_tool_results() to process */
                 json_object_array_add(messages, json_object_get(item));
@@ -143,16 +187,55 @@ struct json_object *resp_input_to_messages(struct json_object *input,
     return messages;
 }
 
-/*
- * Fold function_call_output items into user messages.
- *
- * UvA's API has no "tool" role, so we convert:
- *   {"type":"function_call_output","call_id":"call_xxx","output":"Sunny"}
- * to:
- *   {"role":"user","content":"[Tool result for call_xxx]: Sunny"}
- *
- * Modifies the messages array in place.
- */
+/* Scan backward for a preceding function_call assistant message
+ * with matching call_id; returns function name or NULL. */
+static const char *find_func_name_for_call(struct json_object *messages,
+                                            int pos, const char *call_id)
+{
+    if (!call_id || !call_id[0]) return NULL;
+
+    /* The assistant message with the tool call should be right before
+     * the function_call_output, but scan a few items back to be safe. */
+    for (int j = pos - 1; j >= 0 && j >= pos - 4; j--) {
+        struct json_object *prev = json_object_array_get_idx(messages,
+                                                              (size_t)j);
+        if (!prev) continue;
+
+        /* Check for our synthetic assistant message format:
+         * [Called tool "name" (call_id: xxx) ...] */
+        struct json_object *role_o, *content_o;
+        if (!json_object_object_get_ex(prev, "role", &role_o))
+            continue;
+        const char *r = json_object_get_string(role_o);
+        if (!r || strcmp(r, "assistant") != 0)
+            continue;
+        if (!json_object_object_get_ex(prev, "content", &content_o))
+            continue;
+        const char *c = json_object_get_string(content_o);
+        if (!c) continue;
+
+        /* Match on call_id substring */
+        if (strstr(c, call_id)) {
+            /* Extract name from [Called tool "NAME" ...] */
+            const char *q1 = strstr(c, "Called tool \"");
+            if (q1) {
+                q1 += 13; /* skip: Called tool " */
+                const char *q2 = strchr(q1, '"');
+                if (q2) {
+                    static __thread char name_buf[RESP_MAX_NAME];
+                    size_t nlen = (size_t)(q2 - q1);
+                    if (nlen >= RESP_MAX_NAME)
+                        nlen = RESP_MAX_NAME - 1;
+                    memcpy(name_buf, q1, nlen);
+                    name_buf[nlen] = '\0';
+                    return name_buf;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
 void resp_fold_tool_results(struct json_object *messages)
 {
     if (!messages || !json_object_is_type(messages, json_type_array))
@@ -181,9 +264,18 @@ void resp_fold_tool_results(struct json_object *messages)
         if (json_object_object_get_ex(item, "output", &output_obj))
             output = json_object_get_string(output_obj);
 
-        char content[8192];
-        snprintf(content, sizeof(content),
-                 "[Tool result for %s]: %s", call_id, output);
+        /* Try to find the function name from the preceding call */
+        const char *fn = find_func_name_for_call(messages, i, call_id);
+
+        char content[RESP_MAX_ARGS + 512];
+        if (fn) {
+            snprintf(content, sizeof(content),
+                     "[Result of tool \"%s\" (call_id: %s)]:\n%s",
+                     fn, call_id, output);
+        } else {
+            snprintf(content, sizeof(content),
+                     "[Tool result for %s]: %s", call_id, output);
+        }
 
         struct json_object *msg = json_object_new_object();
         json_object_object_add(msg, "role",

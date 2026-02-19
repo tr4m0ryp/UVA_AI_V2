@@ -40,4 +40,24 @@ typedef struct {
     int              first_token;
 } resp_stream_ctx_t;
 
+/* Shared token callback for buffered paths (accumulates without SSE) */
+void resp_on_buffer_token(const char *token, void *userdata);
+
+/* Shared curl write callback for buffered paths */
+typedef struct {
+    stream_parser_t *parser;
+} resp_buffer_cb_ctx_t;
+
+size_t resp_buffer_write_cb(const char *data, size_t len, void *userdata);
+
+/* Strip tool_call XML blocks from text (defined in tools.c) */
+char *resp_strip_tool_calls(const char *text);
+
+/* Route helpers (defined in route_helpers.c) */
+int  resp_parse_request(struct json_object *parsed, resp_request_t *req);
+char *resp_build_openai_body(struct json_object *messages,
+                              const char *model, const resp_request_t *rr);
+char *resp_build_nonstream_response(const resp_result_t *r,
+                                     const char *model);
+
 #endif /* UVA_PROXY_RESPONSES_INTERNAL_H */

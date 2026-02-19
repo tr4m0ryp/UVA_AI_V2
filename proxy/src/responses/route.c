@@ -20,105 +20,98 @@ void response_end_sse(int fd);
 /* actions.c */
 char *actions_get_or_create_thread(void);
 
+static const char *RETRY_FORCE_MSG =
+    "Your previous response did not contain any <function_call> "
+    "blocks. You MUST respond ONLY with <function_call> blocks. "
+    "Convert your intended actions into actual tool calls now. "
+    "Output ONLY <function_call name=\"...\">...</function_call> "
+    "blocks. No other text, no explanations, no markdown.";
+
 /*
- * Parse the incoming Responses API request body.
- * Returns 0 on success and fills req_out.
+ * Buffer a tool-bearing request through upstream and parse for tool calls.
+ * If the model returns 0 tool calls, retry once with a forcing prompt.
+ * Modifies messages on retry (appends assistant + forcing messages).
+ * Returns handler rc. Result is populated on success.
  */
-static int parse_request(struct json_object *parsed, resp_request_t *req)
+static int tool_request_with_retry(struct json_object *messages,
+                                    const char *model, const char *cookie,
+                                    const resp_request_t *rr,
+                                    resp_result_t *result)
 {
-    memset(req, 0, sizeof(*req));
-    req->stream = 1; /* default: streaming */
+    char *body = resp_build_openai_body(messages, model, rr);
+    char *tid = actions_get_or_create_thread();
+    char *uva = translate_request(body, tid);
+    free(body);
+    free(tid);
+    if (!uva) return -1;
 
-    struct json_object *model_obj;
-    if (json_object_object_get_ex(parsed, "model", &model_obj))
-        snprintf(req->model, sizeof(req->model), "%s",
-                 json_object_get_string(model_obj));
+    int rc = resp_handle_tool_buffered(uva, cookie, model, result);
+    free(uva);
+    if (rc != 0) return rc;
 
-    struct json_object *inst_obj;
-    if (json_object_object_get_ex(parsed, "instructions", &inst_obj))
-        snprintf(req->instructions, sizeof(req->instructions), "%s",
-                 json_object_get_string(inst_obj));
+    /* If tool calls found or empty response, no retry needed */
+    if (result->tool_call_count > 0) return 0;
+    if (!result->full_text || !result->full_text[0]) return 0;
 
-    struct json_object *stream_obj;
-    if (json_object_object_get_ex(parsed, "stream", &stream_obj))
-        req->stream = json_object_get_boolean(stream_obj);
+    /* No tool calls detected -- retry with forcing prompt */
+    fprintf(stderr, "  [responses] 0 tool calls detected, retrying "
+            "with forcing prompt (model: %s)\n", model);
 
-    /* tools (optional) */
-    struct json_object *tools_obj;
-    if (json_object_object_get_ex(parsed, "tools", &tools_obj)) {
-        if (json_object_is_type(tools_obj, json_type_array) &&
-            json_object_array_length(tools_obj) > 0) {
-            req->has_tools = 1;
-            req->tools_json = tools_obj; /* borrowed */
-        }
-    }
+    struct json_object *asst = json_object_new_object();
+    json_object_object_add(asst, "role",
+        json_object_new_string("assistant"));
+    json_object_object_add(asst, "content",
+        json_object_new_string(result->full_text));
+    json_object_array_add(messages, asst);
 
-    /* previous_response_id (optional) */
-    struct json_object *prev_obj;
-    if (json_object_object_get_ex(parsed, "previous_response_id", &prev_obj)) {
-        const char *prev = json_object_get_string(prev_obj);
-        if (prev)
-            snprintf(req->previous_response_id,
-                     sizeof(req->previous_response_id), "%s", prev);
-    }
+    struct json_object *force = json_object_new_object();
+    json_object_object_add(force, "role",
+        json_object_new_string("user"));
+    json_object_object_add(force, "content",
+        json_object_new_string(RETRY_FORCE_MSG));
+    json_object_array_add(messages, force);
 
-    /* input (required) */
-    struct json_object *input_obj;
-    if (json_object_object_get_ex(parsed, "input", &input_obj))
-        req->input_json = input_obj; /* borrowed */
+    free(result->full_text);
+    result->full_text = NULL;
+    result->tool_call_count = 0;
 
-    return 0;
+    body = resp_build_openai_body(messages, model, rr);
+    tid = actions_get_or_create_thread();
+    uva = translate_request(body, tid);
+    free(body);
+    free(tid);
+    if (!uva) return -1;
+
+    rc = resp_handle_tool_buffered(uva, cookie, model, result);
+    free(uva);
+    return rc;
 }
 
 /*
- * Build an OpenAI messages-format request body from normalized messages.
- * This will be passed to translate_request() for UvA conversion.
+ * Emit all SSE events for a completed tool result.
+ * Handles both tool-call and text-fallback cases.
  */
-static char *build_openai_body(struct json_object *messages,
-                                const char *model)
+static void emit_tool_result_sse(int fd, resp_result_t *result,
+                                  const char *model)
 {
-    struct json_object *body = json_object_new_object();
-    json_object_object_add(body, "model",
-        json_object_new_string(model));
-    json_object_object_add(body, "messages", json_object_get(messages));
-    json_object_object_add(body, "stream",
-        json_object_new_boolean(1));
+    resp_emit_created(fd, result, model);
 
-    const char *s = json_object_to_json_string_ext(body,
-        JSON_C_TO_STRING_PLAIN);
-    char *result = strdup(s);
-    json_object_put(body);
-    return result;
-}
-
-/*
- * Build a non-streaming JSON response for the Responses API.
- */
-static char *build_nonstream_response(const resp_result_t *r,
-                                       const char *model)
-{
-    struct json_object *obj = resp_build_skeleton(r, model, "completed");
-
-    struct json_object *output;
-    json_object_object_get_ex(obj, "output", &output);
-
-    if (r->tool_call_count > 0) {
-        for (int i = 0; i < r->tool_call_count; i++) {
-            struct json_object *item = resp_build_func_call_item(
-                &r->tool_calls[i], model, "completed");
-            json_object_array_add(output, item);
+    if (result->tool_call_count > 0) {
+        for (int i = 0; i < result->tool_call_count; i++) {
+            resp_emit_func_call_added(fd, result, i, model);
+            resp_emit_func_call_args_delta(fd, result, i);
+            resp_emit_func_call_args_done(fd, result, i);
+            resp_emit_func_call_item_done(fd, result, i, model);
         }
     } else {
-        struct json_object *item = resp_build_message_item(r, model,
-            r->full_text ? r->full_text : "", "completed");
-        json_object_array_add(output, item);
+        resp_emit_output_item_added(fd, result, model);
+        resp_emit_content_part_added(fd, result);
+        resp_emit_text_done(fd, result);
+        resp_emit_content_part_done(fd, result);
+        resp_emit_output_item_done(fd, result, model);
     }
 
-    const char *s = json_object_to_json_string_ext(obj,
-        JSON_C_TO_STRING_PLAIN);
-    char *result = strdup(s);
-    json_object_put(obj);
-    return result;
+    resp_emit_completed(fd, result, model);
 }
 
 void handle_responses(http_request_t *req)
@@ -159,7 +152,10 @@ void handle_responses(http_request_t *req)
     }
 
     resp_request_t rr;
-    parse_request(parsed, &rr);
+    resp_parse_request(parsed, &rr);
+
+    fprintf(stderr, "  [responses] model=%s stream=%d tools=%d prev=%s\n",
+            rr.model, rr.stream, rr.has_tools, rr.previous_response_id);
 
     /* Use API key model override if request model is empty */
     if (!rr.model[0])
@@ -179,7 +175,6 @@ void handle_responses(http_request_t *req)
         if (prior_json) {
             prior_messages = json_tokener_parse(prior_json);
             free(prior_json);
-            /* Delete old state entry */
             resp_state_delete(rr.previous_response_id);
         }
     }
@@ -211,7 +206,7 @@ void handle_responses(http_request_t *req)
 
     /* Inject tool XML as system message if tools present */
     if (rr.has_tools) {
-        char *tool_xml = resp_tools_to_xml(rr.tools_json);
+        char *tool_xml = resp_tools_to_xml(rr.tools_json, rr.model);
         if (tool_xml) {
             struct json_object *sys = json_object_new_object();
             json_object_object_add(sys, "role",
@@ -219,7 +214,6 @@ void handle_responses(http_request_t *req)
             json_object_object_add(sys, "content",
                 json_object_new_string(tool_xml));
 
-            /* Prepend to messages array */
             int len = (int)json_object_array_length(messages);
             struct json_object *new_msgs = json_object_new_array();
             json_object_array_add(new_msgs, sys);
@@ -233,57 +227,112 @@ void handle_responses(http_request_t *req)
         }
     }
 
-    /* Build OpenAI-format body and translate to UvA format */
-    char *openai_body = build_openai_body(messages, rr.model);
-    char *thread_id = actions_get_or_create_thread();
-    char *uva_body = translate_request(openai_body, thread_id);
-    free(openai_body);
-    free(thread_id);
-
-    if (!uva_body) {
-        json_object_put(messages);
-        if (prior_messages) json_object_put(prior_messages);
-        json_object_put(parsed);
-        response_send_error(req->client_fd, 500,
-            "Failed to translate request");
-        return;
-    }
-
     int rc;
-    if (rr.stream)
-        response_start_sse(req->client_fd);
 
-    /* Dispatch to text stream or tool buffered path */
     if (rr.has_tools) {
-        rc = resp_handle_tool_path(req->client_fd, uva_body,
-            resolved_key.user_session, rr.model, &result);
-    } else {
-        rc = resp_handle_text_stream(req->client_fd, uva_body,
-            resolved_key.user_session, rr.model, &result);
-    }
+        /* Tool path: buffer + parse with retry on failure.
+         * SSE events are emitted only after the final result. */
+        rc = tool_request_with_retry(messages, rr.model,
+            resolved_key.user_session, &rr, &result);
 
-    free(uva_body);
-
-    if (rc != 0) {
-        if (!rr.stream)
-            response_send_error(req->client_fd, 502, "Upstream error");
-        goto cleanup;
-    }
-
-    if (rr.stream) {
-        /* Emit response.completed and end stream */
-        resp_emit_completed(req->client_fd, &result, rr.model);
-        response_end_sse(req->client_fd);
-    } else {
-        /* Non-streaming: send full JSON response */
-        char *resp_json = build_nonstream_response(&result, rr.model);
-        if (resp_json) {
-            response_send_json(req->client_fd, 200, resp_json);
-            free(resp_json);
-        } else {
-            response_send_error(req->client_fd, 500,
-                "Failed to build response");
+        if (rc != 0) {
+            if (!rr.stream)
+                response_send_error(req->client_fd, 502, "Upstream error");
+            goto cleanup;
         }
+
+        if (rr.stream) {
+            response_start_sse(req->client_fd);
+            emit_tool_result_sse(req->client_fd, &result, rr.model);
+            response_end_sse(req->client_fd);
+        } else {
+            char *resp_json = resp_build_nonstream_response(&result,
+                                                             rr.model);
+            if (resp_json) {
+                response_send_json(req->client_fd, 200, resp_json);
+                free(resp_json);
+            } else {
+                response_send_error(req->client_fd, 500,
+                    "Failed to build response");
+            }
+        }
+    } else {
+        /* Non-tool path: build body, translate, dispatch directly */
+        char *openai_body = resp_build_openai_body(messages, rr.model, &rr);
+        char *thread_id = actions_get_or_create_thread();
+        char *uva_body = translate_request(openai_body, thread_id);
+        free(openai_body);
+        free(thread_id);
+
+        if (!uva_body) {
+            json_object_put(messages);
+            if (prior_messages) json_object_put(prior_messages);
+            json_object_put(parsed);
+            response_send_error(req->client_fd, 500,
+                "Failed to translate request");
+            return;
+        }
+
+        if (rr.stream)
+            response_start_sse(req->client_fd);
+
+        if (rr.stream)
+            rc = resp_handle_text_stream(req->client_fd, uva_body,
+                resolved_key.user_session, rr.model, &result);
+        else
+            rc = resp_handle_text_buffered(uva_body,
+                resolved_key.user_session, rr.model, &result);
+        free(uva_body);
+
+        if (rc != 0) {
+            if (!rr.stream)
+                response_send_error(req->client_fd, 502, "Upstream error");
+            goto cleanup;
+        }
+
+        if (rr.stream) {
+            resp_emit_completed(req->client_fd, &result, rr.model);
+            response_end_sse(req->client_fd);
+        } else {
+            char *resp_json = resp_build_nonstream_response(&result,
+                                                             rr.model);
+            if (resp_json) {
+                response_send_json(req->client_fd, 200, resp_json);
+                free(resp_json);
+            } else {
+                response_send_error(req->client_fd, 500,
+                    "Failed to build response");
+            }
+        }
+    }
+
+    /* Append assistant's response to messages before saving state */
+    if (result.tool_call_count > 0) {
+        buffer_t tc_buf;
+        buffer_init(&tc_buf);
+        for (int i = 0; i < result.tool_call_count; i++) {
+            char tc_line[RESP_MAX_ARGS + 256];
+            snprintf(tc_line, sizeof(tc_line),
+                "[Called tool \"%s\" (call_id: %s) with arguments: %s]\n",
+                result.tool_calls[i].name,
+                result.tool_calls[i].call_id,
+                result.tool_calls[i].arguments);
+            buffer_append(&tc_buf, tc_line, strlen(tc_line));
+        }
+        struct json_object *asst = json_object_new_object();
+        json_object_object_add(asst, "role",
+            json_object_new_string("assistant"));
+        json_object_object_add(asst, "content",
+            json_object_new_string(tc_buf.data ? tc_buf.data : ""));
+        json_object_array_add(messages, asst);
+        buffer_free(&tc_buf);
+    } else if (result.full_text && result.full_text[0]) {
+        struct json_object *asst = json_object_new_object();
+        json_object_object_add(asst, "role",
+            json_object_new_string("assistant"));
+        json_object_object_add(asst, "content",
+            json_object_new_string(result.full_text));
+        json_object_array_add(messages, asst);
     }
 
     /* Save state for potential chaining */

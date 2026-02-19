@@ -9,9 +9,9 @@
 #define RESP_CALL_ID_LEN     30   /* "call_" + 24 hex + null */
 #define RESP_MAX_TOOL_CALLS  16
 #define RESP_MAX_NAME        128
-#define RESP_MAX_ARGS        8192
+#define RESP_MAX_ARGS        32768
 #define RESP_MAX_MODEL       128
-#define RESP_MAX_INSTRUCTIONS 4096
+#define RESP_MAX_INSTRUCTIONS 8192
 
 typedef struct {
     char name[RESP_MAX_NAME];
@@ -36,6 +36,9 @@ typedef struct {
     int                stream;
     char               previous_response_id[RESP_ID_LEN];
     struct json_object *input_json;     /* borrowed, do not free */
+    double             temperature;     /* -1 = not set */
+    int                max_tokens;      /* 0  = not set */
+    double             top_p;           /* -1 = not set */
 } resp_request_t;
 
 /* Main entry point for /v1/responses */
@@ -55,7 +58,7 @@ struct json_object *resp_input_to_messages(struct json_object *input,
 void resp_fold_tool_results(struct json_object *messages);
 
 /* Tool XML injection and parsing */
-char *resp_tools_to_xml(struct json_object *tools_json);
+char *resp_tools_to_xml(struct json_object *tools_json, const char *model);
 int   resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
                             int max_calls);
 
@@ -66,6 +69,14 @@ int resp_handle_text_stream(int fd, const char *uva_body,
 int resp_handle_tool_path(int fd, const char *uva_body,
                           const char *cookie, const char *model,
                           resp_result_t *result);
+
+/* Buffered (non-streaming) handler paths */
+int resp_handle_text_buffered(const char *uva_body,
+                              const char *cookie, const char *model,
+                              resp_result_t *result);
+int resp_handle_tool_buffered(const char *uva_body,
+                              const char *cookie, const char *model,
+                              resp_result_t *result);
 
 /* SSE emitters */
 void resp_emit_created(int fd, const resp_result_t *r, const char *model);
