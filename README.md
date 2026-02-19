@@ -14,9 +14,9 @@ By reverse-engineering the platform's internal API (via publicly exposed Next.js
 
 A drop-in replacement for the OpenAI API. Point any tool at your proxy URL and it just works.
 
-- **Chat Completions** (`/api/v1/chat/completions`) -- Streaming SSE responses in standard OpenAI format. Supports system prompts, multi-turn conversations, temperature control, and token limits.
-- **Responses API** (`/api/v1/responses`) -- Full implementation of OpenAI's Responses API with tool-call support and multi-turn state persistence. Enables agentic workflows where the model can call functions, receive results, and continue reasoning.
-- **Model listing** (`/api/v1/models`) -- Standard model enumeration endpoint.
+- **Chat Completions** (`/v1/chat/completions`) -- Streaming SSE responses in standard OpenAI format. Supports system prompts, multi-turn conversations, temperature control, and token limits.
+- **Responses API** (`/v1/responses`) -- Full implementation of OpenAI's Responses API with tool-call support and multi-turn state persistence. Enables agentic workflows where the model can call functions, receive results, and continue reasoning.
+- **Model listing** (`/v1/models`) -- Standard model enumeration endpoint.
 - **7 models available**, including ones hidden from the default UvA chat UI:
   - GPT-5, GPT-5.1, GPT-5 Mini, GPT-5 Nano
   - GPT-4.1, GPT-4o
@@ -28,8 +28,11 @@ Use UvA's models as your coding backbone -- locally or in the cloud.
 
 - **Claude Code compatible** -- The Responses API implements the exact protocol Claude Code expects, including streaming tool calls and `previous_response_id` chaining. Run `claude --model gpt-5` and get full agentic coding with file edits, terminal commands, and multi-step reasoning, all powered by UvA's GPT-5.
 - **Codex CLI compatible** -- Works as a drop-in backend for OpenAI's Codex CLI. Set `OPENAI_BASE_URL` to your proxy and code away.
+- **opencode built-in** -- The project ships with opencode pre-configured. After `./start.sh`, open http://127.0.0.1:5174 for a full browser-based coding assistant connected to GPT-5.
 - **Cursor / Continue / Copilot** -- Any IDE extension that supports custom OpenAI endpoints works with a single config change.
 - **Tool use / function calling** -- The proxy translates OpenAI tool definitions into XML system prompts that the model understands, then parses `<tool_call>` blocks from model output back into structured function call objects. This is what makes agentic coding possible -- the model can read files, run commands, and edit code through tool calls.
+
+![Cloud coding via opencode at http://127.0.0.1:5174](docs/screenshots/cloud_coding.png)
 
 ### Improved Chat Interface
 
@@ -39,14 +42,20 @@ A clean, modern dashboard that improves on UvA's default chat experience.
 - **Per-key configuration** -- Create multiple API keys, each with its own default model, temperature, max tokens, system prompt, and reasoning effort. Use different configs for different tasks (one key for coding with GPT-5, another for quick questions with GPT-5 Nano).
 - **Usage analytics** -- Per-key metrics: total requests, success rate, average latency, output character volume, and a 14-day daily breakdown table. Know exactly how you're using the platform.
 - **Model access** -- Browse and select from all available models, including ones UvA doesn't surface in their chat UI.
+- **Runnable code blocks** -- Code in AI responses can be executed directly in the interface. Task selection lets you choose between different coding, analysis, and reasoning tasks without leaving the chat.
+
+![Chat interface with runnable code and task selection](docs/screenshots/chat_interface.png)
 
 ### Automated Assignment Grading
 
-Built-in grading workflow for batch-processing student submissions with AI.
+Built-in grading workflow for batch-processing student submissions with AI. Upload a rubric, paste in student submissions, and let any available model grade them in batch.
 
 - **Session management** -- Create, track, and manage grading sessions from the dashboard. Each session tracks submission count, results, and timestamps.
-- **Results storage** -- Grading results are stored as structured JSON in Supabase, making them easy to export, query, and analyze.
+- **Results storage** -- Grading results are stored as structured JSON in the local SQLite database, making them easy to export, query, and analyze.
 - **Submission tracking** -- Track the number of submissions processed per session with full audit history.
+- **Configurable model** -- Use GPT-5 for nuanced rubric interpretation or GPT-5 Nano for fast, cheap bulk grading.
+
+![Automated assignment grading session](docs/screenshots/automated_grading.png)
 
 ### API Key Management
 
@@ -56,6 +65,18 @@ Self-service key management with security built in.
 - **Per-key defaults** -- Each key carries its own model, temperature, max tokens, system prompt, and reasoning effort. These are used when the API request doesn't specify overrides.
 - **Enable / disable** -- Toggle keys on and off without deleting them. Useful for rotating keys or temporarily revoking access.
 - **Usage audit** -- Every request is logged with the API key ID, model used, input/output character counts, latency, and success status.
+
+#### Creating a new key
+
+Click **New Key** in the dashboard, give it a name, pick a default model and optionally a system prompt or temperature override. The raw key is displayed once -- copy it before closing.
+
+![Creating a new API key](docs/screenshots/api_creation.png)
+
+#### Managing existing keys
+
+The keys overview shows every key with its creation date, last-used model, total request count, and toggle to enable or disable it. Click any key to drill into per-day usage stats.
+
+![API key management overview](docs/screenshots/api_keys.png)
 
 ### Chrome Extension
 
@@ -119,54 +140,6 @@ Proxy translates back -> OpenAI SSE format -> Tool
 **Chat UI:** Open WebUI (vendored submodule, port 8080).
 **Cloud coding UI:** opencode-web (vendored submodule, port 5174).
 **Coding assistant:** opencode server (port 4096).
-
-## Screenshots
-
-### Dashboard & Chat Interface
-
-The built-in dashboard provides API key management, usage analytics, and a direct chat interface with runnable code blocks and task selection.
-
-![Chat interface with runnable code and task selection](docs/screenshots/chat_interface.png)
-
----
-
-### API Key Management
-
-Create and manage multiple API keys, each with its own model, temperature, system prompt, and usage analytics.
-
-![API key management](docs/screenshots/api_keys.png)
-
----
-
-### API Key Creation
-
-Each key is shown exactly once at creation time and stored as a SHA-256 hash -- raw keys are never persisted.
-
-![API key creation](docs/screenshots/api_creation.png)
-
----
-
-### Cloud Coding
-
-Use UvA's GPT-5 as the backend for cloud coding tools. The proxy implements the full OpenAI Responses API including streaming tool calls, enabling agentic file edits, terminal commands, and multi-step reasoning.
-
-![Cloud coding via opencode](docs/screenshots/cloud_coding.png)
-
----
-
-### Codex CLI Integration
-
-Drop-in backend for OpenAI's Codex CLI. Set `OPENAI_BASE_URL` and code immediately.
-
-![Codex CLI implementation](docs/screenshots/codex_implementation.png)
-
----
-
-### Automated Assignment Grading
-
-Batch-grade student submissions against a rubric using any available model. Sessions track submission counts, results, and timestamps.
-
-![Automated grading](docs/screenshots/automated_grading.png)
 
 ## Setup
 
@@ -274,6 +247,8 @@ export OPENAI_API_KEY=uva-local
 
 codex
 ```
+
+![Codex CLI connected to the UvA proxy](docs/screenshots/codex_implementation.png)
 
 ### opencode (built-in)
 
