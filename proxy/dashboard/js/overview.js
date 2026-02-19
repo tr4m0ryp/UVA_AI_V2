@@ -29,9 +29,10 @@ Dashboard.overview = (function() {
                 '<div class="overview-card-title">Automated Grading</div>' +
                 '<div class="overview-card-desc">Batch-grade student submissions using a rubric and AI evaluation. Upload assignments, run grading, and export results.</div>' +
             '</div>' +
-            '<div class="overview-card" data-nav="coding">' +
+            '<div class="overview-card disabled">' +
                 '<div class="overview-card-icon"><span class="material-symbols-outlined">terminal</span></div>' +
                 '<div class="overview-card-title">Cloud Coding</div>' +
+                '<div class="overview-card-badge">Coming soon</div>' +
                 '<div class="overview-card-desc">Launch an AI-assisted coding environment in the cloud for interactive development sessions with UvA AI support.</div>' +
             '</div>' +
             '<div class="overview-card disabled">' +
