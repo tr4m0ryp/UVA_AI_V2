@@ -5,12 +5,16 @@
 #include <string.h>
 #include <time.h>
 
-/* gpt-5 base and gpt-5-mini resist structured output (code interpreter /
- * refusal). Public: route_helpers.c uses this for retry logic. */
+/* Models that resist structured output (code interpreter / refusal).
+ * These get code-block prompt instead of XML. */
 int resp_is_model_resistant(const char *model)
 {
     if (!model) return 0;
-    return strcmp(model, "gpt-5") == 0 || strcmp(model, "gpt-5-mini") == 0;
+    if (strcmp(model, "gpt-5") == 0) return 1;
+    if (strcmp(model, "gpt-5-mini") == 0) return 1;
+    if (strcmp(model, "gpt-5.1") == 0) return 1;
+    if (strcmp(model, "gpt-4o") == 0) return 1;
+    return 0;
 }
 
 /* gpt-5 family (5, 5.1, 5-mini, 5-nano) needs stronger XML prompt. */

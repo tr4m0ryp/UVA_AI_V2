@@ -3,15 +3,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Normalize <\/ -> </ (some models emit escaped closing tags). */
+static char *normalize_close_tags(const char *text)
+{
+    size_t len = strlen(text);
+    char *out = malloc(len + 1);
+    if (!out) return NULL;
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (text[i] == '<' && i + 2 < len &&
+            text[i+1] == '\\' && text[i+2] == '/')
+            { out[j++] = '<'; i++; }
+        else out[j++] = text[i];
+    }
+    out[j] = '\0';
+    return out;
+}
+
 /* Parse <function_call>/<tool_call> XML blocks from model output.
  * Returns number of calls found. */
 int resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
                           int max_calls)
 {
     if (!text || !out || max_calls <= 0) return 0;
-
+    char *norm = normalize_close_tags(text);
+    if (!norm) return 0;
     int count = 0;
-    const char *p = text;
+    const char *p = norm;
 
     while (count < max_calls) {
         /* Try both tag names -- whichever comes first */
@@ -101,6 +119,7 @@ int resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
         p = end + close_len;
     }
 
+    free(norm);
     return count;
 }
 
@@ -112,16 +131,10 @@ static const char *find_next_open_tag(const char *p,
     const char *fc = strstr(p, "<function_call");
     const char *tc = strstr(p, "<tool_call");
     const char *start = NULL;
-
-    if (fc && tc)
-        start = (fc < tc) ? fc : tc;
-    else if (fc)
-        start = fc;
-    else if (tc)
-        start = tc;
-    else
-        return NULL;
-
+    if (fc && tc) start = (fc < tc) ? fc : tc;
+    else if (fc)  start = fc;
+    else if (tc)  start = tc;
+    else return NULL;
     if (start == fc) {
         *close_str = "</function_call>";
         *close_len = 16;
@@ -137,14 +150,11 @@ static const char *find_next_open_tag(const char *p,
 char *resp_strip_tool_calls(const char *text)
 {
     if (!text) return NULL;
-
     size_t len = strlen(text);
     char *out = malloc(len + 1);
     if (!out) return NULL;
-
     size_t opos = 0;
     const char *p = text;
-
     while (*p) {
         const char *close_str = NULL;
         size_t close_len = 0;
@@ -177,8 +187,6 @@ char *resp_strip_tool_calls(const char *text)
     }
 
     out[opos] = '\0';
-
-    /* Trim trailing whitespace */
     while (opos > 0 && (out[opos - 1] == ' ' || out[opos - 1] == '\n' ||
                          out[opos - 1] == '\r' || out[opos - 1] == '\t')) {
         out[--opos] = '\0';
