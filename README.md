@@ -22,18 +22,6 @@ A drop-in replacement for the OpenAI API. Point any tool at your proxy URL and i
   - GPT-4.1, GPT-4o
   - GPT OSS 120B (open-source 120B parameter model)
 
-### Cloud Coding
-
-Use UvA's models as your coding backbone -- locally or in the cloud.
-
-- **Claude Code compatible** -- The Responses API implements the exact protocol Claude Code expects, including streaming tool calls and `previous_response_id` chaining. Run `claude --model gpt-5` and get full agentic coding with file edits, terminal commands, and multi-step reasoning, all powered by UvA's GPT-5.
-- **Codex CLI compatible** -- Works as a drop-in backend for OpenAI's Codex CLI. Set `OPENAI_BASE_URL` to your proxy and code away.
-- **opencode built-in** -- The project ships with opencode pre-configured. After `./start.sh`, open http://127.0.0.1:5174 for a full browser-based coding assistant connected to GPT-5.
-- **Cursor / Continue / Copilot** -- Any IDE extension that supports custom OpenAI endpoints works with a single config change.
-- **Tool use / function calling** -- The proxy translates OpenAI tool definitions into XML system prompts that the model understands, then parses `<tool_call>` blocks from model output back into structured function call objects. This is what makes agentic coding possible -- the model can read files, run commands, and edit code through tool calls.
-
-![Cloud coding via opencode at http://127.0.0.1:5174](docs/screenshots/cloud_coding.png)
-
 ### Improved Chat Interface
 
 A clean, modern dashboard that improves on UvA's default chat experience.
@@ -86,6 +74,18 @@ A Manifest V3 Chrome extension that eliminates the most annoying part of the set
 - **Debounced updates** -- Batches multiple cookie changes (which happen during login) into a single sync with a 2-second debounce.
 - **Status feedback** -- Badge icon shows green (synced), red (error), or yellow (not configured). The popup shows the last sync result and timestamp.
 - **Manual sync** -- One-click "Sync Now" button for when you need to force a refresh.
+
+### Cloud Coding *(work in progress)*
+
+Use UvA's models as your coding backbone -- locally or in the cloud.
+
+- **Claude Code compatible** -- The Responses API implements the exact protocol Claude Code expects, including streaming tool calls and `previous_response_id` chaining. Run `claude --model gpt-5` and get full agentic coding with file edits, terminal commands, and multi-step reasoning, all powered by UvA's GPT-5.
+- **Codex CLI compatible** -- Works as a drop-in backend for OpenAI's Codex CLI. Set `OPENAI_BASE_URL` to your proxy and code away.
+- **opencode built-in** -- The project ships with opencode pre-configured. After `./start.sh`, open http://127.0.0.1:5174 for a full browser-based coding assistant connected to GPT-5.
+- **Cursor / Continue / Copilot** -- Any IDE extension that supports custom OpenAI endpoints works with a single config change.
+- **Tool use / function calling** -- The proxy translates OpenAI tool definitions into XML system prompts that the model understands, then parses `<tool_call>` blocks from model output back into structured function call objects. This is what makes agentic coding possible -- the model can read files, run commands, and edit code through tool calls.
+
+![Cloud coding via opencode at http://127.0.0.1:5174](docs/screenshots/cloud_coding.png)
 
 ## How it was built
 
@@ -228,32 +228,6 @@ logs/opencode-web.log
 
 ## Usage examples
 
-### Claude Code (cloud coding)
-
-```bash
-export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
-export OPENAI_API_KEY=uva-local
-
-claude --model gpt-5
-```
-
-Full agentic coding: file reads, edits, terminal commands, multi-step reasoning -- all through UvA's GPT-5.
-
-### OpenAI Codex CLI
-
-```bash
-export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
-export OPENAI_API_KEY=uva-local
-
-codex
-```
-
-![Codex CLI connected to the UvA proxy](docs/screenshots/codex_implementation.png)
-
-### opencode (built-in)
-
-opencode is pre-configured via `opencode.json` in the project root. After `./start.sh`, open http://127.0.0.1:5174 and start coding.
-
 ### Python (OpenAI SDK)
 
 ```python
@@ -290,6 +264,32 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 ### VS Code / Cursor / Continue
 
 Point any VS Code AI extension at `http://127.0.0.1:8787/v1` with API key `uva-local`. The proxy is included as a custom model in VS Code settings -- see the `github.copilot.chat.customOAIModels` entry in the project config.
+
+### Claude Code (cloud coding)
+
+```bash
+export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
+export OPENAI_API_KEY=uva-local
+
+claude --model gpt-5
+```
+
+Full agentic coding: file reads, edits, terminal commands, multi-step reasoning -- all through UvA's GPT-5.
+
+### OpenAI Codex CLI
+
+```bash
+export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
+export OPENAI_API_KEY=uva-local
+
+codex
+```
+
+![Codex CLI connected to the UvA proxy](docs/screenshots/codex_implementation.png)
+
+### opencode (built-in)
+
+opencode is pre-configured via `opencode.json` in the project root. After `./start.sh`, open http://127.0.0.1:5174 and start coding.
 
 ## API reference
 
