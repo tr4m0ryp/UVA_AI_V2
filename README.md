@@ -122,13 +122,51 @@ Proxy translates back -> OpenAI SSE format -> Tool
 
 ## Screenshots
 
-| Dashboard | API Keys | Cloud Coding |
-|-----------|----------|--------------|
-| ![dashboard](chatinterface_withrunablecode+taskselection.png) | ![api keys](api_keys.png) | ![cloud coding](cloudcoding.png) |
+### Dashboard & Chat Interface
 
-| API Creation | Codex | Automated Grading |
-|---|---|---|
-| ![api creation](API_creation.png) | ![codex](Codex_implementation.png) | ![grading](automated_grading.png) |
+The built-in dashboard provides API key management, usage analytics, and a direct chat interface with runnable code blocks and task selection.
+
+![Chat interface with runnable code and task selection](docs/screenshots/chat_interface.png)
+
+---
+
+### API Key Management
+
+Create and manage multiple API keys, each with its own model, temperature, system prompt, and usage analytics.
+
+![API key management](docs/screenshots/api_keys.png)
+
+---
+
+### API Key Creation
+
+Each key is shown exactly once at creation time and stored as a SHA-256 hash -- raw keys are never persisted.
+
+![API key creation](docs/screenshots/api_creation.png)
+
+---
+
+### Cloud Coding
+
+Use UvA's GPT-5 as the backend for cloud coding tools. The proxy implements the full OpenAI Responses API including streaming tool calls, enabling agentic file edits, terminal commands, and multi-step reasoning.
+
+![Cloud coding via opencode](docs/screenshots/cloud_coding.png)
+
+---
+
+### Codex CLI Integration
+
+Drop-in backend for OpenAI's Codex CLI. Set `OPENAI_BASE_URL` and code immediately.
+
+![Codex CLI implementation](docs/screenshots/codex_implementation.png)
+
+---
+
+### Automated Assignment Grading
+
+Batch-grade student submissions against a rubric using any available model. Sessions track submission counts, results, and timestamps.
+
+![Automated grading](docs/screenshots/automated_grading.png)
 
 ## Setup
 
@@ -291,15 +329,3 @@ All endpoints are served by `uva-proxy` on port `8787`.
 | `*` | `/dashboard/` | Web dashboard (HTML/CSS/JS) |
 | `*` | `/api/dashboard/…` | Dashboard REST API (keys, users, grading, etc.) |
 
-## Roadmap
-
-- **Rate limiting and quotas** -- Per-key rate limits and daily token quotas to prevent abuse and share access fairly.
-- **Multi-user sharing** -- Team API keys and shared grading sessions for course staff.
-- **Streaming tool calls** -- Real-time streaming of tool-call arguments as they're generated, instead of buffering the full response.
-- **Image and file support** -- Vision model support (image inputs) and file attachment handling through the API.
-- **Firefox extension** -- Port the Chrome extension to Firefox with WebExtension APIs.
-- **Grading pipeline improvements** -- Rubric parsing from PDF/DOCX, batch auto-grading with configurable models, score distribution visualization, and CSV/Excel export.
-
-## Disclaimer
-
-This project is for educational and research purposes. It relies on reverse-engineering a university platform and may break if UvA changes their internal API. Use responsibly and in accordance with your institution's acceptable use policies.
