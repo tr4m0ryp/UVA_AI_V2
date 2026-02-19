@@ -62,18 +62,18 @@ Built-in grading workflow for batch-processing student submissions with AI. Uplo
 - **Session management** -- Create, track, and manage grading sessions from the dashboard. Each session tracks submission count, results, and timestamps.
 - **Results storage** -- Grading results are stored as structured JSON in the local SQLite database, making them easy to export, query, and analyze.
 - **Submission tracking** -- Track the number of submissions processed per session with full audit history.
-- **Configurable model** -- Use GPT-5 for nuanced rubric interpretation or GPT-5 Nano for fast, cheap bulk grading.
+- **Graded by GPT-5.1** -- Submissions are evaluated using GPT-5.1, which offers strong instruction-following and rubric adherence.
 
 ![Automated assignment grading session](docs/screenshots/automated_grading.png)
 
-### Chrome Extension
+### Automatic Cookie Sync
 
-A Manifest V3 Chrome extension that eliminates the most annoying part of the setup -- session cookie management.
+A background thread inside the proxy watches your local Chrome and Firefox cookie databases and automatically picks up a fresh session token whenever you log into UvA.
 
-- **Automatic sync** -- Watches for cookie changes on `aichat.uva.nl` and automatically pushes them to the proxy. Log into UvA once and the proxy stays authenticated.
-- **Debounced updates** -- Batches multiple cookie changes (which happen during login) into a single sync with a 2-second debounce.
-- **Status feedback** -- Badge icon shows green (synced), red (error), or yellow (not configured). The popup shows the last sync result and timestamp.
-- **Manual sync** -- One-click "Sync Now" button for when you need to force a refresh.
+- **Polling monitor** -- Reads the Chrome/Firefox SQLite cookie database directly from the filesystem every 2 seconds. No browser extension required.
+- **Multi-browser support** -- Works with Google Chrome, Chromium, and Firefox on Linux and macOS.
+- **Validation** -- Each detected cookie is validated against UvA's upstream API before being applied, so stale or partial cookies are ignored.
+- **Auto-login flow** -- Running `./uva-proxy --login` opens a browser window pointing at `aichat.uva.nl`. Once you log in, the proxy captures the session cookie automatically and writes it to `proxy.env`.
 
 ### Cloud Coding *(work in progress)*
 
@@ -91,7 +91,7 @@ Use UvA's models as your coding backbone -- locally or in the cloud.
 
 The entire project was built by reverse-engineering UvA's AI Chat frontend:
 
-1. **Source map extraction** -- UvA's Next.js deployment ships public source maps at `/_next/static/chunks/{hash}.js.map`. The original TypeScript source was recovered from these maps, revealing the full API surface, server action IDs, request formats, and authentication flow. The recovered source lives in `upstream/extracted/`.
+1. **Source map extraction** -- UvA's Next.js deployment ships public source maps at `/_next/static/chunks/{hash}.js.map`. The original TypeScript source was recovered from these maps, revealing the full API surface, server action IDs, request formats, and authentication flow.
 
 2. **Request format discovery** -- The upstream platform uses Vercel AI SDK v2 with a custom SSE format (`{"type":"text-delta","delta":"..."}`). Each request requires fresh UUID v4 identifiers for both the thread and message. The proxy generates these automatically.
 
@@ -263,7 +263,7 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 
 ### VS Code / Cursor / Continue
 
-Point any VS Code AI extension at `http://127.0.0.1:8787/v1` with API key `uva-local`. The proxy is included as a custom model in VS Code settings -- see the `github.copilot.chat.customOAIModels` entry in the project config.
+Point any VS Code AI extension at `http://127.0.0.1:8787/v1` with API key `uva-local`. Works with Continue.dev, Cursor, and any extension that accepts a custom OpenAI-compatible base URL.
 
 ### Claude Code (cloud coding)
 
