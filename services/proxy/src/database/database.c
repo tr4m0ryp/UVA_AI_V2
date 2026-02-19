@@ -51,7 +51,38 @@ static const char *SCHEMA_SQL =
     "CREATE INDEX IF NOT EXISTS idx_request_logs_key "
     "  ON request_logs(api_key_id);"
     "CREATE INDEX IF NOT EXISTS idx_request_logs_created "
-    "  ON request_logs(created_at);";
+    "  ON request_logs(created_at);"
+    "CREATE TABLE IF NOT EXISTS grading_sessions ("
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,"
+    "  name TEXT NOT NULL,"
+    "  assignment_text TEXT DEFAULT '',"
+    "  rubric_text TEXT DEFAULT '',"
+    "  example_text TEXT DEFAULT '',"
+    "  submission_count INTEGER DEFAULT 0,"
+    "  avg_percentage REAL DEFAULT 0,"
+    "  status TEXT DEFAULT 'in_progress',"
+    "  created_at TEXT DEFAULT (datetime('now'))"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_grading_sessions_user "
+    "  ON grading_sessions(user_id);"
+    "CREATE TABLE IF NOT EXISTS grading_results ("
+    "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "  session_id INTEGER NOT NULL REFERENCES grading_sessions(id) ON DELETE CASCADE,"
+    "  student_name TEXT NOT NULL,"
+    "  student_id_str TEXT NOT NULL,"
+    "  file_name TEXT DEFAULT '',"
+    "  total_score REAL DEFAULT 0,"
+    "  total_max REAL DEFAULT 0,"
+    "  percentage REAL DEFAULT 0,"
+    "  overall_feedback TEXT DEFAULT '',"
+    "  criteria_json TEXT DEFAULT '[]',"
+    "  status TEXT DEFAULT 'pending',"
+    "  error_text TEXT DEFAULT '',"
+    "  created_at TEXT DEFAULT (datetime('now'))"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_grading_results_session "
+    "  ON grading_results(session_id);";
 
 int db_init(const char *path)
 {
@@ -81,6 +112,17 @@ int db_init(const char *path)
         sqlite3_close(g_db);
         g_db = NULL;
         return -1;
+    }
+
+    /* Schema migrations -- idempotent ALTER TABLE statements */
+    static const char *MIGRATIONS[] = {
+        "ALTER TABLE users ADD COLUMN github_token TEXT DEFAULT NULL",
+        "ALTER TABLE users ADD COLUMN github_login TEXT DEFAULT NULL",
+        NULL
+    };
+    for (int i = 0; MIGRATIONS[i]; i++) {
+        /* Ignore "duplicate column" errors */
+        sqlite3_exec(g_db, MIGRATIONS[i], NULL, NULL, NULL);
     }
 
     fprintf(stderr, "Database initialized: %s\n", path);

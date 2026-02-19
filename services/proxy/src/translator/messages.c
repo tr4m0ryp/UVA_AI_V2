@@ -1,4 +1,5 @@
 #include "translator.h"
+#include "upstream.h"   /* buffer_t */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,27 +32,7 @@ static void gen_uuid(char *buf)
     buf[pos] = '\0';
 }
 
-/*
- * Translate OpenAI chat completion request -> UvA request body.
- *
- * OpenAI format:
- *   {"model":"...","messages":[{"role":"user","content":"..."}],
- *    "temperature":0.7,"stream":true,...}
- *
- * UvA format (confirmed via traffic capture):
- *   {
- *     "id": "<thread-id>",
- *     "messages": [{"role":"user","content":"...","id":"msg-x",
- *                   "parts":[{"type":"text","text":"..."}]}],
- *     "message": <last message object>,
- *     "chatId": "<thread-id>",
- *     "messageId": "<last-msg-id>",
- *     "trigger": "submit-message",
- *     "flags": { "enforceInternetSearch":false, ... "isNewChat":false },
- *     "overrides": { "model":"gpt-4.1", "personaId":"" },
- *     "requestTime": "2026-02-18T08:00:00.000Z"
- *   }
- */
+/* Translate OpenAI chat completion request -> UvA request body. */
 static struct json_object *make_uva_message(const char *role,
                                              const char *content,
                                              const char *msg_id)
@@ -90,9 +71,10 @@ char *translate_request(const char *openai_body, const char *thread_id)
     const char *uva_model = models_to_uva(model);
 
     /*
-     * The UvA frontend sends only the last message as "message" (not
-     * the full history). Build the last message object with parts.
-     * Message IDs must be UUID format or UvA returns HTTP 500.
+     * UvA's API accepts only a single "message" object (not full history).
+     * We fold system messages and assistant context into the final user
+     * message so the model sees the complete prompt. Message IDs must be
+     * UUID format or UvA returns HTTP 500.
      */
     struct json_object *msgs;
     struct json_object *last_msg = NULL;
@@ -101,18 +83,46 @@ char *translate_request(const char *openai_body, const char *thread_id)
 
     if (json_object_object_get_ex(req, "messages", &msgs)) {
         int len = (int)json_object_array_length(msgs);
-        if (len > 0) {
+
+        /* Collect system/context messages and the final user message */
+        buffer_t combined;
+        buffer_init(&combined);
+        const char *final_role = "user";
+        const char *final_content = "";
+
+        for (int i = 0; i < len; i++) {
             struct json_object *m = json_object_array_get_idx(msgs,
-                                                               (size_t)(len - 1));
+                                                               (size_t)i);
             struct json_object *role_o, *content_o;
-            const char *r = "user", *c = "";
+            const char *r = "", *c = "";
             if (json_object_object_get_ex(m, "role", &role_o))
                 r = json_object_get_string(role_o);
             if (json_object_object_get_ex(m, "content", &content_o))
                 c = json_object_get_string(content_o);
 
-            last_msg = make_uva_message(r, c, last_msg_id);
+            if (i == len - 1) {
+                /* Last message: preserve its role */
+                final_role = r;
+                final_content = c;
+            } else if (c && c[0]) {
+                /* Prefix from system/assistant/user context messages */
+                if (combined.size > 0)
+                    buffer_append(&combined, "\n\n", 2);
+                buffer_append(&combined, c, strlen(c));
+            }
         }
+
+        /* If there were prefix messages, combine them with final */
+        if (combined.size > 0 && final_content[0]) {
+            buffer_append(&combined, "\n\n", 2);
+            buffer_append(&combined, final_content, strlen(final_content));
+            last_msg = make_uva_message(final_role, combined.data,
+                                        last_msg_id);
+        } else {
+            last_msg = make_uva_message(final_role, final_content,
+                                        last_msg_id);
+        }
+        buffer_free(&combined);
     }
 
     if (last_msg)

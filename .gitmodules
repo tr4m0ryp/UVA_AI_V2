@@ -4,3 +4,6 @@
 [submodule "vendor/opencode-web"]
 	path = vendor/opencode-web
 	url = https://github.com/chris-tse/opencode-web.git
+[submodule "vendor/codex"]
+	path = vendor/codex
+	url = https://github.com/openai/codex.git

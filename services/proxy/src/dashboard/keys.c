@@ -105,14 +105,6 @@ void dashboard_keys_create(http_request_t *req, const db_user_t *user)
         return;
     }
 
-    const char *model = json_get_str(body, "model", NULL);
-    if (!model || !model[0]) {
-        json_object_put(body);
-        response_send_error(req->client_fd, 400,
-            "Missing 'model' field");
-        return;
-    }
-
     /* Generate key */
     char plaintext[128], hash[65], prefix[32];
     if (apikey_generate(plaintext, sizeof(plaintext),
@@ -132,7 +124,8 @@ void dashboard_keys_create(http_request_t *req, const db_user_t *user)
     snprintf(key.key_prefix, sizeof(key.key_prefix), "%s", prefix);
     snprintf(key.name, sizeof(key.name), "%s",
              json_get_str(body, "name", ""));
-    snprintf(key.model, sizeof(key.model), "%s", model);
+    snprintf(key.model, sizeof(key.model), "%s",
+             json_get_str(body, "model", "gpt-4o"));
     key.temperature = json_get_double(body, "temperature", 0.5);
     key.top_p = json_get_double(body, "top_p", 0.5);
     key.max_tokens = json_get_int(body, "max_tokens", 4096);
@@ -190,7 +183,7 @@ void dashboard_keys_update(http_request_t *req, const db_user_t *user,
     snprintf(key.name, sizeof(key.name), "%s",
              json_get_str(body, "name", ""));
     snprintf(key.model, sizeof(key.model), "%s",
-             json_get_str(body, "model", ""));
+             json_get_str(body, "model", "gpt-4o"));
     key.temperature = json_get_double(body, "temperature", 0.5);
     key.top_p = json_get_double(body, "top_p", 0.5);
     key.max_tokens = json_get_int(body, "max_tokens", 4096);
@@ -201,11 +194,6 @@ void dashboard_keys_update(http_request_t *req, const db_user_t *user,
     snprintf(key.system_prompt, sizeof(key.system_prompt), "%s",
              json_get_str(body, "system_prompt", ""));
     json_object_put(body);
-
-    if (!key.model[0]) {
-        response_send_error(req->client_fd, 400, "Missing 'model'");
-        return;
-    }
 
     if (db_key_update(key_id, user->id, &key) != 0) {
         response_send_error(req->client_fd, 404,

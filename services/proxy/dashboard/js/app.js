@@ -17,17 +17,37 @@ Dashboard.app = (function() {
         });
     }
 
-    function loadServiceIframe(iframeId, url, serviceName, setupHint) {
+    function loadWebUI(iframeId) {
         var frame = document.getElementById(iframeId);
         if (!frame || frame.src) return;
-        fetch(url, { mode: 'no-cors' })
-            .then(function() { frame.src = url; })
-            .catch(function() {
-                frame.parentElement.innerHTML =
-                    '<div class="service-offline">' +
-                    '<h3>' + serviceName + ' is not running</h3>' +
-                    '<p>' + setupHint + '</p></div>';
-            });
+        var container = frame.parentElement;
+
+        function checkStatus() {
+            fetch('/api/dashboard/webui/status')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ready) {
+                        frame.src = 'http://127.0.0.1:' + data.port;
+                    } else {
+                        container.innerHTML =
+                            '<div class="service-offline">' +
+                            '<h3>Chat interface is starting up...</h3>' +
+                            '<p>Open WebUI is loading. This page will refresh automatically.</p></div>';
+                        setTimeout(function() {
+                            container.innerHTML = '';
+                            container.appendChild(frame);
+                            checkStatus();
+                        }, 3000);
+                    }
+                })
+                .catch(function() {
+                    container.innerHTML =
+                        '<div class="service-offline">' +
+                        '<h3>Chat interface is not available</h3>' +
+                        '<p>Could not reach the proxy status endpoint.</p></div>';
+                });
+        }
+        checkStatus();
     }
 
     function init() {
@@ -56,15 +76,12 @@ Dashboard.app = (function() {
         });
         Dashboard.router.register('chat', {
             mount: function() {
-                loadServiceIframe('chat-iframe', 'http://127.0.0.1:5173',
-                    'Chat Interface', 'Run ./start-all.sh to launch all services including Open WebUI.');
+                loadWebUI('chat-iframe');
             }
         });
         Dashboard.router.register('coding', {
-            mount: function() {
-                loadServiceIframe('coding-iframe', 'http://127.0.0.1:5174',
-                    'Cloud Coding', 'Run ./start-all.sh to launch all services including opencode-web.');
-            }
+            mount: Dashboard.coding.mount,
+            unmount: Dashboard.coding.unmount
         });
 
         /* Check for existing session */

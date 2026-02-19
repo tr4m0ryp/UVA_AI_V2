@@ -113,7 +113,6 @@ Dashboard.keys = (function() {
                     '<span class="key-name-text">' + esc(k.name || 'Unnamed Key') + '</span>' +
                     '<span class="key-prefix-text">' + esc(k.key_prefix) + '</span>' +
                 '</div></td>' +
-                '<td><span class="badge-model">' + esc(k.model) + '</span></td>' +
                 '<td><span class="badge-status ' + statusClass + '">' +
                     '<span class="dot"></span>' + statusText + '</span></td>' +
                 '<td class="hide-mobile"><span class="key-date">' +
@@ -175,36 +174,57 @@ Dashboard.keys = (function() {
         var el = document.getElementById('guide-base-url');
         if (el) el.textContent = base;
 
+        /* Populate model selector */
+        var select = document.getElementById('guide-model-select');
+        if (select) {
+            Dashboard.models.populateSelect(select, 'gpt-4o');
+            select.removeEventListener('change', updateGuideSnippets);
+            select.addEventListener('change', updateGuideSnippets);
+        }
+
+        updateGuideSnippets();
+    }
+
+    function updateGuideSnippets() {
+        var base = getBaseUrl();
+        var select = document.getElementById('guide-model-select');
+        var model = (select && select.value) ? select.value : 'gpt-4o';
+
         setText('guide-codex-config',
-            'model = "gpt-4o"\n' +
-            'provider = "openai"\n' +
-            'wire_api = "responses"\n\n' +
-            '[providers.openai]\n' +
+            'model_provider = "uva_proxy"\n' +
+            'model = "' + model + '"\n\n' +
+            '[model_providers.uva_proxy]\n' +
             'name = "UvA Proxy"\n' +
-            'base_url = "' + base + '/v1"');
+            'base_url = "' + base + '/v1"\n' +
+            'env_key = "UVA_PROXY_API_KEY"\n' +
+            'wire_api = "responses"');
 
         setText('guide-codex-env',
-            'export OPENAI_API_KEY="uva-sk-your-key-here"\n' +
+            'export UVA_PROXY_API_KEY="uva-sk-your-key-here"\n' +
             'codex "Explain this codebase"');
 
         setText('guide-continue-config',
             'models:\n' +
-            '  - name: gpt-4o\n' +
+            '  - name: ' + model + '\n' +
             '    provider: openai\n' +
             '    apiBase: ' + base + '/v1/\n' +
             '    apiKey: uva-sk-your-key-here\n' +
-            '    model: gpt-4o');
+            '    model: ' + model);
 
         setText('guide-vscode-config',
+            '// settings.json\n' +
             '{\n' +
-            '  "chat.models.customOAIModels": [\n' +
-            '    {\n' +
-            '      "name": "UvA GPT-4o",\n' +
+            '  "github.copilot.chat.customOAIModels": {\n' +
+            '    "' + model + '": {\n' +
+            '      "name": "UvA ' + model + '",\n' +
             '      "url": "' + base + '/v1/chat/completions",\n' +
-            '      "authHeader": "Bearer uva-sk-your-key-here",\n' +
-            '      "modelId": "gpt-4o"\n' +
+            '      "requiresAPIKey": true,\n' +
+            '      "toolCalling": true,\n' +
+            '      "vision": true,\n' +
+            '      "maxInputTokens": 128000,\n' +
+            '      "maxOutputTokens": 16384\n' +
             '    }\n' +
-            '  ]\n' +
+            '  }\n' +
             '}');
 
         setText('guide-curl-chat',
@@ -212,7 +232,7 @@ Dashboard.keys = (function() {
             '  -H "Authorization: Bearer uva-sk-your-key-here" \\\n' +
             '  -H "Content-Type: application/json" \\\n' +
             '  -d \'{\n' +
-            '    "model": "gpt-4o",\n' +
+            '    "model": "' + model + '",\n' +
             '    "stream": true,\n' +
             '    "messages": [\n' +
             '      {"role": "user", "content": "Hello!"}\n' +
@@ -229,7 +249,7 @@ Dashboard.keys = (function() {
             '    api_key="uva-sk-your-key-here",\n' +
             ')\n\n' +
             'response = client.chat.completions.create(\n' +
-            '    model="gpt-4o",\n' +
+            '    model="' + model + '",\n' +
             '    messages=[{"role": "user", "content": "Hello!"}],\n' +
             ')\n' +
             'print(response.choices[0].message.content)');
@@ -292,7 +312,6 @@ Dashboard.keys = (function() {
         header.innerHTML =
             '<div class="key-detail-title-row">' +
                 '<span class="key-detail-name">' + esc(key.name || 'Unnamed Key') + '</span>' +
-                '<span class="badge-model">' + esc(key.model) + '</span>' +
             '</div>' +
             '<div class="key-detail-meta">' +
                 '<div class="key-detail-meta-item">Prefix: <strong>' +
@@ -416,7 +435,6 @@ Dashboard.keys = (function() {
         document.getElementById('modal-key-title').textContent = 'Create API Key';
         document.getElementById('modal-key-submit').textContent = 'Create';
         resetForm();
-        Dashboard.models.populateSelect(document.getElementById('key-model'), 'claude-sonnet-4.5');
         document.getElementById('modal-key').classList.remove('hidden');
     }
 
@@ -425,7 +443,6 @@ Dashboard.keys = (function() {
         document.getElementById('modal-key-title').textContent = 'Edit API Key';
         document.getElementById('modal-key-submit').textContent = 'Save';
         document.getElementById('key-name').value = k.name || '';
-        Dashboard.models.populateSelect(document.getElementById('key-model'), k.model);
         setSlider('key-temp', 'val-temp', k.temperature);
         setSlider('key-topp', 'val-topp', k.top_p);
         document.getElementById('key-maxtokens').value = k.max_tokens;
@@ -464,7 +481,6 @@ Dashboard.keys = (function() {
     function getFormData() {
         return {
             name: document.getElementById('key-name').value.trim(),
-            model: document.getElementById('key-model').value,
             temperature: parseFloat(document.getElementById('key-temp').value),
             top_p: parseFloat(document.getElementById('key-topp').value),
             max_tokens: parseInt(document.getElementById('key-maxtokens').value, 10),

@@ -19,6 +19,16 @@ typedef struct {
     int      do_login;
     int      verbose;
     int      headless;
+    /* GitHub OAuth */
+    char     github_client_id[256];
+    char     github_client_secret[256];
+    /* VPS Docker host */
+    char     vps_host[256];
+    char     vps_ssh_key[512];
+    char     vps_docker_image[256];
+    /* Open WebUI auto-launch */
+    int      webui_enabled;    /* 1 = auto-launch (default), 0 = skip */
+    uint16_t webui_port;       /* default: 8080 */
 } proxy_config_t;
 
 /* Load config from proxy.env file, then override with CLI args.

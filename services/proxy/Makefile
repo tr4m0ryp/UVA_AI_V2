@@ -13,9 +13,9 @@ BIN      = uva-proxy
 ifeq ($(UNAME),Linux)
   CFLAGS      += -D_GNU_SOURCE -DPLATFORM_LINUX
   PLATFORM_SRC = src/platform/linux.c
-  LDFLAGS      = -lcurl -ljson-c -lssl -lcrypto -lpthread -lz -ldl -lm
+  LDFLAGS      = -lcurl -ljson-c -lssl -lcrypto -lpthread -lutil -lz -ldl -lm
   ifeq ($(STATIC),1)
-    LDFLAGS = -static -lcurl -ljson-c -lssl -lcrypto -lpthread -lz -ldl -lm
+    LDFLAGS = -static -lcurl -ljson-c -lssl -lcrypto -lpthread -lutil -lz -ldl -lm
   endif
 endif
 ifeq ($(UNAME),Darwin)

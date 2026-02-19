@@ -584,6 +584,17 @@ input[type="range"] { width: 100%; margin-top: 6px; accent-color: var(--accent);
     border: 1px solid var(--border);
     color: var(--text-primary);
 }
+.guide-model-select {
+    width: auto;
+    min-width: 160px;
+    padding: 4px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
 
 .guide-tabs {
     display: flex;

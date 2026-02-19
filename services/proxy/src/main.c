@@ -3,7 +3,9 @@
 #include "upstream.h"
 #include "auth.h"
 #include "database.h"
+#include "project.h"
 #include "responses.h"
+#include "webui.h"
 #include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,9 @@
 
 /* actions.c */
 void actions_cleanup_threads(void);
+
+/* Global config pointer for VPS, GitHub, etc. */
+const proxy_config_t *g_config = NULL;
 
 static void signal_handler(int sig)
 {
@@ -47,12 +52,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    g_config = &cfg;
+
     if (cfg.verbose)
         config_print(&cfg);
 
     /* Initialize database */
     if (db_init("proxy.db") != 0) {
         fprintf(stderr, "Failed to initialize database.\n");
+        platform_cleanup();
+        return 1;
+    }
+
+    /* Initialize projects schema */
+    if (db_project_init_schema() != 0) {
+        fprintf(stderr, "Failed to initialize projects schema.\n");
+        db_close();
         platform_cleanup();
         return 1;
     }
@@ -157,6 +172,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Launch Open WebUI unless disabled */
+    if (cfg.webui_enabled) {
+        if (webui_start(&cfg) == 0)
+            fprintf(stderr, "  Chat UI:    http://127.0.0.1:%d\n\n",
+                    cfg.webui_port);
+        else
+            fprintf(stderr, "  Chat UI:    unavailable (setup failed)\n\n");
+    }
+
     /* Launch app-mode window unless --headless */
     if (!cfg.headless) {
         pthread_t tid;
@@ -171,6 +195,7 @@ int main(int argc, char **argv)
 
     /* Cleanup */
     fprintf(stderr, "Cleaning up...\n");
+    webui_stop();
     auth_stop_refresh();
     actions_cleanup_threads();
     upstream_cleanup();

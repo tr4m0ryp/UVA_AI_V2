@@ -50,13 +50,19 @@ static int fill_user(sqlite3_stmt *stmt, db_user_t *out)
     const char *t = (const char *)sqlite3_column_text(stmt, 4);
     if (t) snprintf(out->dashboard_token, sizeof(out->dashboard_token), "%s", t);
 
+    const char *gt = (const char *)sqlite3_column_text(stmt, 5);
+    if (gt) snprintf(out->github_token, sizeof(out->github_token), "%s", gt);
+
+    const char *gl = (const char *)sqlite3_column_text(stmt, 6);
+    if (gl) snprintf(out->github_login, sizeof(out->github_login), "%s", gl);
+
     return 0;
 }
 
 int db_user_find_by_email(const char *email, db_user_t *out)
 {
     db_lock();
-    const char *sql = "SELECT id, email, name, uva_session, dashboard_token "
+    const char *sql = "SELECT id, email, name, uva_session, dashboard_token, github_token, github_login "
                       "FROM users WHERE email = ?1";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL);
@@ -77,7 +83,7 @@ int db_user_find_by_email(const char *email, db_user_t *out)
 int db_user_find_by_token(const char *token, db_user_t *out)
 {
     db_lock();
-    const char *sql = "SELECT id, email, name, uva_session, dashboard_token "
+    const char *sql = "SELECT id, email, name, uva_session, dashboard_token, github_token, github_login "
                       "FROM users WHERE dashboard_token = ?1";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL);
@@ -131,6 +137,40 @@ int db_user_clear_token(int64_t user_id)
 {
     db_lock();
     const char *sql = "UPDATE users SET dashboard_token = NULL WHERE id = ?1";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) { db_unlock(); return -1; }
+
+    sqlite3_bind_int64(stmt, 1, user_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    db_unlock();
+    return (rc == SQLITE_DONE) ? 0 : -1;
+}
+
+int db_user_set_github(int64_t user_id, const char *token, const char *login)
+{
+    db_lock();
+    const char *sql = "UPDATE users SET github_token = ?1, "
+                      "github_login = ?2 WHERE id = ?3";
+    sqlite3_stmt *stmt = NULL;
+    int rc = sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) { db_unlock(); return -1; }
+
+    sqlite3_bind_text(stmt, 1, token, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, login, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 3, user_id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    db_unlock();
+    return (rc == SQLITE_DONE) ? 0 : -1;
+}
+
+int db_user_clear_github(int64_t user_id)
+{
+    db_lock();
+    const char *sql = "UPDATE users SET github_token = NULL, "
+                      "github_login = NULL WHERE id = ?1";
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) { db_unlock(); return -1; }

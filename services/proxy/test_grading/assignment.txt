@@ -1,0 +1,14 @@
+Assignment: Implement a Stack in Python
+
+Write a Python module that implements a Stack data structure with the following requirements:
+
+1. Class named `Stack` with an internal list for storage
+2. Methods: push(item), pop(), peek(), is_empty(), size()
+3. pop() and peek() must raise an IndexError when the stack is empty
+4. Include a __repr__ method that shows the stack contents
+5. Write at least 3 unit tests using the `unittest` module in a `if __name__ == "__main__"` block
+
+Constraints:
+- Pure Python, no external libraries
+- Code must be well-commented
+- Follow PEP 8 style guidelines

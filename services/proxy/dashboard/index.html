@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="/dashboard/css/auth.css">
     <link rel="stylesheet" href="/dashboard/css/sidebar.css">
     <link rel="stylesheet" href="/dashboard/css/grading.css">
+    <link rel="stylesheet" href="/dashboard/css/coding.css">
+    <link rel="stylesheet" href="/dashboard/vendor/xterm/xterm.css">
 </head>
 <body>
     <!-- Login page -->
@@ -109,7 +111,6 @@
                                 <thead>
                                     <tr>
                                         <th>Name</th>
-                                        <th>Model</th>
                                         <th>Status</th>
                                         <th class="hide-mobile">Created</th>
                                         <th class="hide-mobile">Last Used</th>
@@ -135,6 +136,10 @@
                                 <div class="guide-endpoint-row">
                                     <span class="guide-endpoint-label">Endpoints</span>
                                     <code>/v1/chat/completions</code> <code>/v1/responses</code> <code>/v1/models</code>
+                                </div>
+                                <div class="guide-endpoint-row">
+                                    <span class="guide-endpoint-label">Model</span>
+                                    <select id="guide-model-select" class="guide-model-select"></select>
                                 </div>
                             </div>
                             <div class="guide-tabs">
@@ -226,7 +231,7 @@
                 <div class="view-header">
                     <h2>Automated Grading</h2>
                 </div>
-                <div class="grading-steps" id="grading-steps">
+                <div class="grading-steps hidden" id="grading-steps">
                     <div class="step active" data-step="1">
                         <span class="step-number">1</span>
                         <span class="step-label">Setup</span>
@@ -242,9 +247,11 @@
                         <span class="step-label">Results</span>
                     </div>
                 </div>
-                <div id="grading-panel-1" class="grading-panel"></div>
+                <div id="grading-history" class="grading-panel"></div>
+                <div id="grading-panel-1" class="grading-panel hidden"></div>
                 <div id="grading-panel-2" class="grading-panel hidden"></div>
                 <div id="grading-panel-3" class="grading-panel hidden"></div>
+                <div id="grading-session-detail" class="grading-panel hidden"></div>
             </div>
 
             <!-- Chat view -->
@@ -254,7 +261,61 @@
 
             <!-- Cloud Coding view -->
             <div id="view-coding" class="view view-coding hidden">
-                <iframe id="coding-iframe" class="coding-iframe" frameborder="0" allowfullscreen></iframe>
+                <div class="coding-layout">
+                    <!-- Task sidebar -->
+                    <div class="coding-sidebar">
+                        <div class="coding-sidebar-header">
+                            <h3>Tasks</h3>
+                            <button id="coding-btn-new-project" class="coding-btn-new-project">+ New Task</button>
+                        </div>
+                        <div id="coding-github-section" class="coding-github-section">
+                            <button id="coding-github-btn" class="coding-github-btn connect">Connect GitHub</button>
+                            <span id="coding-github-user" class="coding-github-user hidden"></span>
+                        </div>
+                        <div id="coding-project-list" class="coding-project-list"></div>
+                    </div>
+                    <!-- Main panel -->
+                    <div class="coding-main">
+                        <div class="coding-main-header">
+                            <span id="coding-main-title" class="coding-main-title">Cloud Coding</span>
+                            <select id="coding-model-select" class="coding-model-select"></select>
+                            <div class="coding-status">
+                                <span id="coding-status-dot" class="coding-status-dot"></span>
+                                <span id="coding-status-text"></span>
+                            </div>
+                            <button id="coding-btn-reconnect" class="coding-btn-reconnect" style="display:none">Terminal</button>
+                            <button id="coding-btn-logs" class="coding-btn-logs" style="display:none">Logs</button>
+                            <span id="coding-task-info" class="coding-task-info"></span>
+                        </div>
+                        <div id="coding-no-project" class="coding-no-project">
+                            <h3>Cloud Coding</h3>
+                            <p>Connect your GitHub account, select a repo, and give instructions. Codex runs autonomously in a Docker container on a VPS and pushes changes to a dedicated branch.</p>
+                        </div>
+                        <div id="coding-terminal" class="coding-terminal hidden"></div>
+                        <div id="coding-logs-panel" class="coding-logs-panel hidden">
+                            <pre id="coding-logs-content" class="coding-logs-content"></pre>
+                        </div>
+                    </div>
+                </div>
+                <!-- New Task Modal -->
+                <div id="coding-modal-overlay" class="coding-modal-overlay hidden">
+                    <div class="coding-modal">
+                        <h3>New Coding Task</h3>
+                        <label>Repository
+                            <select id="coding-proj-repo"></select>
+                        </label>
+                        <label>Model
+                            <select id="coding-proj-model"></select>
+                        </label>
+                        <label>Instructions
+                            <textarea id="coding-proj-instructions" rows="4" placeholder="Describe what Codex should do..."></textarea>
+                        </label>
+                        <div class="coding-modal-actions">
+                            <button id="coding-modal-cancel" class="btn">Cancel</button>
+                            <button id="coding-modal-submit" class="btn btn-primary">Start Task</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -269,9 +330,6 @@
             <form id="form-key">
                 <label>Name (optional)
                     <input type="text" id="key-name" placeholder="My key">
-                </label>
-                <label>Model
-                    <select id="key-model"></select>
                 </label>
                 <label>Temperature: <span id="val-temp">0.5</span>
                     <input type="range" id="key-temp" min="0" max="2" step="0.1" value="0.5">
@@ -324,6 +382,10 @@
         </div>
     </div>
 
+    <script src="/dashboard/vendor/pdfjs/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = '/dashboard/vendor/pdfjs/pdf.worker.min.js';</script>
+    <script src="/dashboard/vendor/xterm/xterm.js"></script>
+    <script src="/dashboard/vendor/xterm/xterm-addon-fit.js"></script>
     <script src="/dashboard/js/api.js"></script>
     <script src="/dashboard/js/auth.js"></script>
     <script src="/dashboard/js/models.js"></script>
@@ -333,7 +395,9 @@
     <script src="/dashboard/js/keys.js"></script>
     <script src="/dashboard/js/grading-api.js"></script>
     <script src="/dashboard/js/grading-ui.js"></script>
+    <script src="/dashboard/js/grading-history.js"></script>
     <script src="/dashboard/js/grading.js"></script>
+    <script src="/dashboard/js/coding.js"></script>
     <script src="/dashboard/js/app.js"></script>
 </body>
 </html>

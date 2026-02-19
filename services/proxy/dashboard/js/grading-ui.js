@@ -3,12 +3,58 @@ var Dashboard = Dashboard || {};
 
 Dashboard.gradingUI = (function() {
     var ACCEPTED_SETUP = '.txt,.md,.tex,.pdf,.py,.java,.c,.js,.ts,.html,.css';
-    var ACCEPTED_SUB   = '.txt,.md,.py,.java,.c,.js,.ts,.html,.css';
+    var ACCEPTED_SUB   = '.txt,.md,.pdf,.py,.java,.c,.js,.ts,.html,.css';
 
     function esc(str) {
         var d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
+    }
+
+    /* Extract text from a PDF file using pdf.js. Returns a Promise<string>. */
+    function extractPdfText(file) {
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                var typedArray = new Uint8Array(ev.target.result);
+                pdfjsLib.getDocument({ data: typedArray }).promise.then(function(pdf) {
+                    var pages = [];
+                    var pending = pdf.numPages;
+                    if (pending === 0) { resolve(''); return; }
+                    for (var i = 1; i <= pdf.numPages; i++) {
+                        (function(pageNum) {
+                            pdf.getPage(pageNum).then(function(page) {
+                                page.getTextContent().then(function(tc) {
+                                    var text = tc.items.map(function(item) {
+                                        return item.str;
+                                    }).join(' ');
+                                    pages[pageNum - 1] = text;
+                                    pending--;
+                                    if (pending === 0) {
+                                        resolve(pages.join('\n\n'));
+                                    }
+                                });
+                            });
+                        })(i);
+                    }
+                }).catch(function(err) {
+                    reject(new Error('Failed to read PDF: ' + err.message));
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    /* Read a file as text, auto-detecting PDFs for extraction. Returns Promise<string>. */
+    function readFileAsText(file) {
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+            return extractPdfText(file);
+        }
+        return new Promise(function(resolve) {
+            var reader = new FileReader();
+            reader.onload = function(ev) { resolve(ev.target.result); };
+            reader.readAsText(file);
+        });
     }
 
     /* Attach file/text toggle logic to one assignment section.
@@ -38,14 +84,14 @@ Dashboard.gradingUI = (function() {
         fileInput.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            var reader = new FileReader();
-            reader.onload = function(ev) {
-                setFileFn(file.name, ev.target.result);
+            readFileAsText(file).then(function(text) {
+                setFileFn(file.name, text);
                 textarea.classList.add('hidden');
                 badge.classList.remove('hidden');
                 badge.querySelector('.file-badge-name').textContent = file.name;
-            };
-            reader.readAsText(file);
+            }).catch(function(err) {
+                alert('Could not read file: ' + err.message);
+            });
             e.target.value = '';
         });
 
@@ -58,12 +104,16 @@ Dashboard.gradingUI = (function() {
     }
 
     function buildSection(sectionKey, labelText, optional) {
-        var optTag = optional ? ' <span class="section-optional">(optional)</span>' : '';
+        var reqTag = optional
+            ? ' <span class="section-optional">(optional)</span>'
+            : ' <span class="section-required">*</span>';
         return '<div class="assignment-section">' +
             '<div class="section-header">' +
-            '<span class="section-label">' + labelText + optTag + '</span>' +
+            '<span class="section-label">' + labelText + reqTag + '</span>' +
             '<label class="file-input-group">' +
-            '<span class="btn btn-sm">Upload file</span>' +
+            '<span class="btn btn-sm">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">upload_file</span>' +
+            'Upload</span>' +
             '<input type="file" id="section-file-' + sectionKey + '" ' +
             'accept="' + ACCEPTED_SETUP + '" class="hidden-file-input">' +
             '</label></div>' +
@@ -83,12 +133,22 @@ Dashboard.gradingUI = (function() {
         var el = document.getElementById(containerId);
         el.innerHTML =
             '<div class="grading-form">' +
+            '<div class="grading-card">' +
+            '<div class="grading-card-header">' +
+            '<div class="grading-card-title">Assignment Setup</div>' +
+            '<div class="grading-card-desc">' +
+            'Provide the assignment description, grading rubric, and optionally an example answer. ' +
+            'You can paste text directly or upload a file for each section.</div>' +
+            '</div>' +
             buildSection('assignment', 'Assignment', false) +
             buildSection('rubric', 'Rubric', false) +
             buildSection('exampleAnswer', 'Example Answer', true) +
             '<div class="grading-actions">' +
             '<button type="button" class="btn btn-primary" id="btn-setup-next">' +
-            'Next: Add Submissions</button></div></div>';
+            'Next: Add Submissions' +
+            '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-left:6px">arrow_forward</span>' +
+            '</button></div>' +
+            '</div></div>';
 
         attachSectionHandlers('assignment', state.assignment,
             Dashboard.grading.setAssignmentText,
@@ -119,23 +179,47 @@ Dashboard.gradingUI = (function() {
         var el = document.getElementById(containerId);
         el.innerHTML =
             '<div class="grading-form">' +
+            '<div class="grading-card">' +
+            '<div class="grading-card-header">' +
+            '<div class="grading-card-title">Student Submissions</div>' +
+            '<div class="grading-card-desc">' +
+            'Add each student\'s submission with their name, ID, and file. ' +
+            'All queued submissions will be graded against your rubric.</div>' +
+            '</div>' +
             '<div class="submission-input-group">' +
-            '<label>Student Name<input type="text" id="sub-name" placeholder="Full name"></label>' +
-            '<label>Student ID<input type="text" id="sub-studentid" placeholder="Student number"></label>' +
+            '<div class="submission-field-row">' +
+            '<label>Student Name <span class="section-required">*</span>' +
+            '<input type="text" id="sub-name" placeholder="Full name"></label>' +
+            '<label>Student ID <span class="section-required">*</span>' +
+            '<input type="text" id="sub-studentid" placeholder="Student number"></label>' +
+            '</div>' +
+            '<div class="submission-file-row">' +
             '<label class="file-input-group submission-file-label">' +
-            '<span class="btn btn-sm">Choose file</span>' +
+            '<span class="btn btn-sm">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">upload_file</span>' +
+            'Choose file</span>' +
             '<span id="sub-file-name" class="sub-file-name">No file selected</span>' +
             '<input type="file" id="sub-file" accept="' + ACCEPTED_SUB + '" ' +
             'class="hidden-file-input">' +
             '</label>' +
-            '<button type="button" class="btn btn-sm" id="btn-add-sub">Add Submission</button>' +
+            '<button type="button" class="btn btn-primary btn-sm" id="btn-add-sub">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">add</span>' +
+            'Add</button>' +
             '</div>' +
-            '<h3>Queued Submissions (<span id="sub-count">0</span>)</h3>' +
+            '</div>' +
+            '<div class="submission-queue-header">' +
+            '<span class="submission-queue-title">Queued Submissions</span>' +
+            '<span class="submission-queue-count" id="sub-count">0</span>' +
+            '</div>' +
             '<div id="submission-list"></div>' +
             '<div class="grading-actions">' +
-            '<button type="button" class="btn" id="btn-sub-back">Back to Setup</button>' +
+            '<button type="button" class="btn" id="btn-sub-back">' +
+            '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">arrow_back</span>' +
+            'Back to Setup</button>' +
             '<button type="button" class="btn btn-primary" id="btn-grade-all">' +
-            'Grade All</button></div></div>';
+            '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px">grading</span>' +
+            'Grade All</button>' +
+            '</div></div></div>';
 
         /* Track pending file for the add form */
         var pendingFile = null;
@@ -158,12 +242,12 @@ Dashboard.gradingUI = (function() {
             var capturedName = name;
             var capturedSid  = sid;
 
-            var reader = new FileReader();
-            reader.onload = function(ev) {
+            readFileAsText(capturedFile).then(function(text) {
                 Dashboard.grading.addSubmission(capturedName, capturedSid,
-                    capturedFile.name, ev.target.result);
-            };
-            reader.readAsText(capturedFile);
+                    capturedFile.name, text);
+            }).catch(function(err) {
+                alert('Could not read file: ' + err.message);
+            });
 
             /* Reset form */
             document.getElementById('sub-name').value = '';
@@ -192,6 +276,13 @@ Dashboard.gradingUI = (function() {
         if (!list) return;
         list.innerHTML = '';
         if (count) count.textContent = state.submissions.length;
+
+        if (state.submissions.length === 0) {
+            list.innerHTML = '<div class="submission-empty">' +
+                'No submissions added yet. Use the form above to add student work.</div>';
+            return;
+        }
+
         state.submissions.forEach(function(sub) {
             var row = document.createElement('div');
             row.className = 'submission-row';
@@ -199,7 +290,8 @@ Dashboard.gradingUI = (function() {
                 '<span class="submission-name">' + esc(sub.name) + '</span>' +
                 '<span class="submission-studentid">' + esc(sub.studentId) + '</span>' +
                 '<span class="submission-filename">' + esc(sub.fileName) + '</span>' +
-                '<button type="button" class="btn btn-sm btn-danger btn-remove-sub">Remove</button>';
+                '<button type="button" class="btn-icon danger btn-remove-sub" title="Remove submission">' +
+                '<span class="material-symbols-outlined">close</span></button>';
             row.querySelector('.btn-remove-sub').addEventListener('click', function() {
                 Dashboard.grading.removeSubmission(sub.id);
             });
@@ -210,16 +302,45 @@ Dashboard.gradingUI = (function() {
     /* --- Results Panel (Panel 3) --- */
     function buildResultsPanel(containerId, state) {
         var el = document.getElementById(containerId);
+
+        /* Count completed results for summary */
+        var doneCount = 0;
+        var totalScore = 0;
+        state.submissions.forEach(function(sub) {
+            if (sub.status === 'done' && sub.result) {
+                doneCount++;
+                totalScore += sub.result.percentage;
+            }
+        });
+        var avgText = doneCount > 0
+            ? '<strong>' + Math.round(totalScore / doneCount) + '%</strong> average across <strong>' + doneCount + '</strong> submissions'
+            : 'Grading in progress...';
+
         el.innerHTML =
-            '<div class="grading-form"><div class="results-toolbar">' +
-            '<button type="button" class="btn btn-sm" id="btn-export-csv">Export CSV</button>' +
-            '<button type="button" class="btn" id="btn-results-back">New Grading</button>' +
-            '</div><div id="results-list"></div></div>';
+            '<div class="grading-form">' +
+            '<div class="results-toolbar">' +
+            '<div class="results-summary">' + avgText + '</div>' +
+            '<div class="results-toolbar-actions">' +
+            '<button type="button" class="btn btn-sm" id="btn-export-csv">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">download</span>' +
+            'Export CSV</button>' +
+            '<button type="button" class="btn" id="btn-results-back">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">restart_alt</span>' +
+            'New Grading</button>' +
+            '<button type="button" class="btn" id="btn-back-sessions">' +
+            '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">history</span>' +
+            'Back to Sessions</button>' +
+            '</div></div>' +
+            '<div id="results-list"></div></div>';
+
         document.getElementById('btn-export-csv').addEventListener('click', function() {
             exportCSV(state);
         });
         document.getElementById('btn-results-back').addEventListener('click', function() {
-            Dashboard.grading.setStep(1);
+            Dashboard.grading.startNew();
+        });
+        document.getElementById('btn-back-sessions').addEventListener('click', function() {
+            Dashboard.grading.backToHistory();
         });
         renderResults(state);
     }
@@ -233,19 +354,26 @@ Dashboard.gradingUI = (function() {
             card.className = 'result-card';
             card.setAttribute('data-sub-id', sub.id);
 
-            var headerName = esc(sub.name) + ' <span class="result-studentid">(ID: ' +
-                esc(sub.studentId) + ')</span>';
+            var headerName = esc(sub.name) +
+                ' <span class="result-studentid">' + esc(sub.studentId) + '</span>';
 
             if (sub.status === 'grading') {
                 card.innerHTML = '<div class="result-header">' +
                     '<span class="result-name">' + headerName + '</span>' +
-                    '<span class="spinner"></span></div>';
+                    '<span class="result-status">' +
+                    '<div class="grading-spinner">' +
+                    '<span class="grading-spinner-dot"></span>' +
+                    '<span class="grading-spinner-dot"></span>' +
+                    '<span class="grading-spinner-dot"></span>' +
+                    '</div>Grading</span></div>';
             } else if (sub.status === 'error') {
                 card.innerHTML = '<div class="result-header result-error">' +
                     '<span class="result-name">' + headerName + '</span>' +
-                    '<span class="result-status">Error</span></div>' +
+                    '<span class="result-status">Failed</span></div>' +
                     '<p class="result-error-msg">' + esc(sub.error || 'Unknown error') + '</p>' +
-                    '<button type="button" class="btn btn-sm btn-retry">Retry</button>';
+                    '<button type="button" class="btn btn-sm btn-retry">' +
+                    '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">refresh</span>' +
+                    'Retry</button>';
                 card.querySelector('.btn-retry').addEventListener('click', function() {
                     Dashboard.grading.retrySubmission(sub.id);
                 });
@@ -256,16 +384,21 @@ Dashboard.gradingUI = (function() {
                 var ch = '';
                 for (var i = 0; i < r.criteria.length; i++) {
                     var c = r.criteria[i];
+                    var barPct = c.maxScore > 0 ? Math.round((c.score / c.maxScore) * 100) : 0;
                     ch += '<div class="criteria-detail-row">' +
+                        '<div class="cd-header">' +
                         '<span class="cd-name">' + esc(c.name) + '</span>' +
                         '<span class="cd-score">' + c.score + '/' + c.maxScore + '</span>' +
-                        '<p class="cd-feedback">' + esc(c.feedback || '') + '</p></div>';
+                        '</div>' +
+                        '<div class="cd-bar-track"><div class="cd-bar-fill" style="width:' + barPct + '%"></div></div>' +
+                        (c.feedback ? '<p class="cd-feedback">' + esc(c.feedback) + '</p>' : '') +
+                        '</div>';
                 }
                 card.innerHTML = '<div class="result-header">' +
                     '<span class="result-name">' + headerName + '</span>' +
                     '<span class="result-score ' + cls + '">' + r.totalScore + '/' +
                     r.totalMax + ' (' + pct + '%)</span></div>' +
-                    '<p class="result-feedback">' + esc(r.overallFeedback || '') + '</p>' +
+                    '<div class="result-feedback">' + esc(r.overallFeedback || '') + '</div>' +
                     '<details class="criteria-detail">' +
                     '<summary>Per-criterion breakdown</summary>' + ch + '</details>';
             } else {

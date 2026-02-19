@@ -78,7 +78,19 @@ void response_end_sse(int fd)
     (void)fd; /* connection will be closed by caller */
 }
 
-/* Declaration for external use */
+void response_send_redirect(int fd, const char *url)
+{
+    char header[2048];
+    int hlen = snprintf(header, sizeof(header),
+        "HTTP/1.1 302 Found\r\n"
+        "Location: %s\r\n"
+        "Content-Length: 0\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        url);
+    platform_send(fd, header, (size_t)hlen);
+}
+
 void response_send_options(int fd)
 {
     const char *header =

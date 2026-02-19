@@ -69,11 +69,16 @@ static char *apply_apikey_overrides(const char *body,
     struct json_object *parsed = json_tokener_parse(body);
     if (!parsed) return NULL;
 
-    /* Override model */
-    snprintf(model_buf, model_size, "%s", ak->model);
-    json_object_object_del(parsed, "model");
-    json_object_object_add(parsed, "model",
-        json_object_new_string(ak->model));
+    /* Use client's model if present, fall back to key's model */
+    struct json_object *existing_model;
+    if (json_object_object_get_ex(parsed, "model", &existing_model)) {
+        snprintf(model_buf, model_size, "%s",
+            json_object_get_string(existing_model));
+    } else {
+        snprintf(model_buf, model_size, "%s", ak->model);
+        json_object_object_add(parsed, "model",
+            json_object_new_string(ak->model));
+    }
 
     /* Inject system prompt at front of messages */
     if (ak->system_prompt[0]) {

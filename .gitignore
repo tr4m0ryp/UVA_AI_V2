@@ -1,19 +1,23 @@
-# ─── Node / npm ───────────────────────────────────────────────────────────────
+# ─── Node / bun ───────────────────────────────────────────────────────────────
 node_modules/
 package-lock.json
+bun.lockb
 *.tsbuildinfo
+.next/
+dist/
+out/
 
 # ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
+.venv/
+*.egg-info/
 
 # ─── C build artifacts ────────────────────────────────────────────────────────
 services/proxy/build/
 services/proxy/uva-proxy
-
-# ─── Next.js build output ─────────────────────────────────────────────────────
-.next/
+services/proxy/uva-proxy.exe
 
 # ─── Databases ────────────────────────────────────────────────────────────────
 services/proxy/proxy.db
@@ -29,18 +33,30 @@ services/proxy/proxy.env
 .env
 .env.*
 !.env.example
+!services/proxy/proxy.env.example
+
+# ─── Runtime / process files ──────────────────────────────────────────────────
+.stack.pids
+logs/
+nohup.out
+
+# ─── Open WebUI build output (vendored submodule) ─────────────────────────────
+vendor/open-webui/build/
+vendor/open-webui/backend/data/
+vendor/open-webui/.venv/
+
+# ─── Upstream extracted source: ignore generated/installed artefacts only ─────
+upstream/extracted/apps/client/node_modules/
+upstream/extracted/apps/client/.next/
+upstream/extracted/apps/client/tsconfig.tsbuildinfo
 
 # ─── Captured traffic (potentially sensitive) ─────────────────────────────────
 upstream/capture/captured_traffic.json
 upstream/capture/capture_summary.txt
 
-# ─── Source maps (extracted source already in upstream/extracted/) ─────────────
+# ─── Source maps and prettified bundle duplicates ─────────────────────────────
 upstream/bundles/*.map
-
-# ─── Prettified bundle duplicates ─────────────────────────────────────────────
 upstream/bundles/*_pretty.js
-
-# ─── Raw HTML captures (not real API docs) ────────────────────────────────────
 upstream/bundles/api_*.txt
 
 # ─── OS / editor ──────────────────────────────────────────────────────────────

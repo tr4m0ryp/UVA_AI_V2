@@ -1,12 +1,12 @@
 # UvA AI V2
 
-An improved, reverse-engineered version of UvA's AI Chat platform ([aichat.uva.nl](https://aichat.uva.nl)). Unlocks the full potential of the university's AI infrastructure by providing an OpenAI-compatible API, a better chat interface, cloud coding capabilities, automated assignment grading, and more -- all powered by models UvA already pays for but restricts behind a basic web UI.
+A reverse-engineered local proxy for UvA's AI Chat platform ([aichat.uva.nl](https://aichat.uva.nl)). Unlocks the full potential of the university's AI infrastructure by providing an OpenAI-compatible API, a better chat interface, cloud coding capabilities, automated assignment grading, and more -- all powered by models UvA already pays for but restricts behind a basic web UI.
 
 ## Why this exists
 
 UvA gives students and staff access to GPT-5, GPT-4.1, and other models, but locks them behind a minimal chat interface with no API access, no tool integration, no coding support, and no way to use them with external tools. This project changes that.
 
-By reverse-engineering the platform's internal API (via publicly exposed source maps), we built a full proxy layer that speaks the OpenAI API standard. This means every tool in the OpenAI ecosystem -- Claude Code, Codex CLI, Cursor, Continue, GitHub Copilot, and any OpenAI SDK client -- works with UvA's models out of the box.
+By reverse-engineering the platform's internal API (via publicly exposed Next.js source maps), we built a full proxy layer written in C that speaks the OpenAI API standard. This means every tool in the OpenAI ecosystem -- Claude Code, Codex CLI, Cursor, Continue, GitHub Copilot, and any OpenAI SDK client -- works with UvA's models out of the box.
 
 ## Features
 
@@ -70,101 +70,158 @@ A Manifest V3 Chrome extension that eliminates the most annoying part of the set
 
 The entire project was built by reverse-engineering UvA's AI Chat frontend:
 
-1. **Source map extraction** -- UvA's Next.js deployment ships public source maps at `/_next/static/chunks/{hash}.js.map`. The original TypeScript source was recovered from these maps, revealing the full API surface, server action IDs, request formats, and authentication flow.
+1. **Source map extraction** -- UvA's Next.js deployment ships public source maps at `/_next/static/chunks/{hash}.js.map`. The original TypeScript source was recovered from these maps, revealing the full API surface, server action IDs, request formats, and authentication flow. The recovered source lives in `upstream/extracted/`.
 
 2. **Request format discovery** -- The upstream platform uses Vercel AI SDK v2 with a custom SSE format (`{"type":"text-delta","delta":"..."}`). Each request requires fresh UUID v4 identifiers for both the thread and message. The proxy generates these automatically.
 
-3. **Authentication chain** -- Users authenticate via Azure AD (UvA's SSO). The session cookies from `aichat.uva.nl` (`__Host-authjs.csrf-token` and `authjs.session-token`) are captured and stored per-user, then injected into every upstream request.
+3. **Authentication chain** -- Users authenticate via Azure AD (UvA's SSO). The session cookie from `aichat.uva.nl` (`__Secure-next-auth.session-token`) is stored in `proxy.env` and injected into every upstream request. The proxy monitors cookie expiry and can re-authenticate automatically.
 
 4. **Translation layer** -- The proxy translates bidirectionally between OpenAI and UvA formats:
    - OpenAI `messages` array becomes UvA's `{id, message, flags, overrides}` structure
    - UvA's `text-delta` SSE events become OpenAI's `choices[0].delta.content` format
    - Tool definitions become XML system prompts; XML tool-call blocks in output become OpenAI function call objects
 
-5. **State persistence** -- Multi-turn Responses API conversations are persisted in Supabase with a 2-hour TTL, supporting `previous_response_id` chaining that matches OpenAI's stateful conversation model.
+5. **State persistence** -- Multi-turn Responses API conversations are persisted in a local SQLite database with a 2-hour TTL, supporting `previous_response_id` chaining that matches OpenAI's stateful conversation model.
 
 ## Architecture
 
 ```
 User / External Tool
     |
-    |  Standard OpenAI API (Bearer key auth)
+    |  Standard OpenAI API  (Bearer key auth)
     v
-+---------------------------+
-|  UvA AI V2 Proxy          |
-|  (Next.js 15 on Vercel)   |
-|                            |
-|  - Translates formats      |
-|  - Manages API keys        |
-|  - Tracks usage            |
-|  - Handles tool calls      |
-|  - Persists state          |
-+---------------------------+
++--------------------------------------+
+|  uva-proxy  (C, port 8787)           |
+|                                      |
+|  Translates formats                  |
+|  Manages API keys (SQLite)           |
+|  Tracks usage / analytics            |
+|  Handles tool calls                  |
+|  Persists Responses API state        |
+|  Serves dashboard UI                 |
++--------------------------------------+
     |
     |  UvA internal format + session cookies
     v
-+---------------------------+
-|  aichat.uva.nl            |
-|  (UvA's AI platform)      |
-|                            |
-|  GPT-5, GPT-4.1, etc.     |
-+---------------------------+
++--------------------------------------+
+|  aichat.uva.nl                       |
+|  (UvA's Next.js AI platform)         |
+|                                      |
+|  GPT-5, GPT-4.1, GPT-4o, ...        |
++--------------------------------------+
     |
     |  Vercel AI SDK v2 SSE stream
     v
 Proxy translates back -> OpenAI SSE format -> Tool
 ```
 
-**Stack:** Next.js 15 (App Router, Turbopack), Bun, TypeScript, Supabase (Postgres), NextAuth.js (Azure AD), Vercel.
+**Stack:** C99, SQLite3, libcurl, json-c, OpenSSL, pthreads.
+**Chat UI:** Open WebUI (vendored submodule, port 8080).
+**Cloud coding UI:** opencode-web (vendored submodule, port 5174).
+**Coding assistant:** opencode server (port 4096).
+
+## Screenshots
+
+| Dashboard | API Keys | Cloud Coding |
+|-----------|----------|--------------|
+| ![dashboard](chatinterface_withrunablecode+taskselection.png) | ![api keys](api_keys.png) | ![cloud coding](cloudcoding.png) |
+
+| API Creation | Codex | Automated Grading |
+|---|---|---|
+| ![api creation](API_creation.png) | ![codex](Codex_implementation.png) | ![grading](automated_grading.png) |
 
 ## Setup
 
 ### Prerequisites
 
-- [Bun](https://bun.sh)
-- A Supabase project (free tier works)
-- Azure AD credentials (UvA tenant)
+| Tool | Purpose | Install |
+|------|---------|---------|
+| `gcc` / `make` | Build the C proxy | `sudo apt install build-essential` |
+| `libcurl`, `libjson-c`, `libssl` | Proxy dependencies | `sudo apt install libcurl4-openssl-dev libjson-c-dev libssl-dev` |
+| `uv` | Python venv (Open WebUI) | auto-installed by `./start.sh` |
+| `bun` | opencode-web dev server | auto-installed by `./start.sh` |
+| `opencode` | AI coding assistant | auto-installed by `./start.sh` |
 
 ### Quick start
 
 ```bash
-git clone https://github.com/tr4m0ryp/UVA_AI_V2.git
+git clone --recurse-submodules https://github.com/tr4m0ryp/UVA_AI_V2.git
 cd UVA_AI_V2
-cp .env.example .env   # Fill in your credentials
-./run                   # Installs deps, validates env, starts dev server
+
+# Configure your session cookie (see below for how to get it)
+cp services/proxy/proxy.env.example services/proxy/proxy.env
+$EDITOR services/proxy/proxy.env
+
+# Start all services (installs missing tools automatically)
+./start.sh
 ```
 
-### Environment variables
+On first run `./start.sh` will:
+- Build the C proxy binary
+- Create the Open WebUI Python venv and install dependencies
+- Build the Open WebUI frontend
+- Install opencode-web dependencies
+- Start all four services
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `NEXTAUTH_URL` | Your app URL (e.g. `http://localhost:3000`) |
-| `NEXTAUTH_SECRET` | Random 32-char secret for session encryption |
-| `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
-| `AZURE_AD_CLIENT_SECRET` | Azure AD client secret |
-| `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
+Subsequent runs are fast -- nothing is reinstalled if already present.
 
-### Database
+To reset a running stack and restart cleanly:
 
-Run the SQL files in `supabase/migrations/` against your Supabase project (dashboard SQL editor or CLI).
+```bash
+./start.sh --reset
+```
 
-### Chrome extension
+### Getting your session cookie
 
-1. Open `chrome://extensions` and enable Developer Mode
-2. Click "Load unpacked" and select the `extension/` directory
-3. Click the extension icon, enter your proxy URL and an API key
-4. Log into `aichat.uva.nl` -- cookies sync automatically
+1. Open [https://aichat.uva.nl](https://aichat.uva.nl) in Chrome or Firefox.
+2. Log in with your UvA / HvA credentials (Azure AD).
+3. Open DevTools (`F12`) → Application → Cookies → `https://aichat.uva.nl`.
+4. Copy the **full value** of `__Secure-next-auth.session-token`.
+5. Paste it into `services/proxy/proxy.env`:
+   ```
+   UVA_SESSION_COOKIE="__Secure-next-auth.session-token=eyJ..."
+   ```
+
+Alternatively, run `./services/proxy/uva-proxy --login` after building -- this opens a browser and captures the cookie automatically.
+
+### Services
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Proxy API + dashboard | http://127.0.0.1:8787 | OpenAI-compatible API and management UI |
+| Chat interface | http://127.0.0.1:8080 | Open WebUI (full-featured chat) |
+| opencode server | http://127.0.0.1:4096 | AI coding assistant backend |
+| opencode-web UI | http://127.0.0.1:5174 | Cloud coding web interface |
+
+### Running the proxy only
+
+If you only need the API without the chat UI or coding tools:
+
+```bash
+cd services/proxy
+make -j$(nproc)
+cp proxy.env.example proxy.env   # fill in your cookie
+./uva-proxy --port 8787 --headless
+```
+
+### Logs
+
+All service logs are written to `logs/` in the project root:
+
+```
+logs/proxy.log
+logs/webui.log
+logs/opencode.log
+logs/opencode-web.log
+```
 
 ## Usage examples
 
 ### Claude Code (cloud coding)
 
 ```bash
-export OPENAI_BASE_URL=https://your-proxy.vercel.app/api/v1
-export OPENAI_API_KEY=uva-your-api-key-here
+export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
+export OPENAI_API_KEY=uva-local
 
 claude --model gpt-5
 ```
@@ -174,11 +231,15 @@ Full agentic coding: file reads, edits, terminal commands, multi-step reasoning 
 ### OpenAI Codex CLI
 
 ```bash
-export OPENAI_BASE_URL=https://your-proxy.vercel.app/api/v1
-export OPENAI_API_KEY=uva-your-api-key-here
+export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
+export OPENAI_API_KEY=uva-local
 
 codex
 ```
+
+### opencode (built-in)
+
+opencode is pre-configured via `opencode.json` in the project root. After `./start.sh`, open http://127.0.0.1:5174 and start coding.
 
 ### Python (OpenAI SDK)
 
@@ -186,8 +247,8 @@ codex
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://your-proxy.vercel.app/api/v1",
-    api_key="uva-your-api-key-here",
+    base_url="http://127.0.0.1:8787/v1",
+    api_key="uva-local",
 )
 
 response = client.chat.completions.create(
@@ -203,8 +264,8 @@ for chunk in response:
 ### curl
 
 ```bash
-curl https://your-proxy.vercel.app/api/v1/chat/completions \
-  -H "Authorization: Bearer uva-your-api-key-here" \
+curl http://127.0.0.1:8787/v1/chat/completions \
+  -H "Authorization: Bearer uva-local" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -213,28 +274,31 @@ curl https://your-proxy.vercel.app/api/v1/chat/completions \
   }'
 ```
 
+### VS Code / Cursor / Continue
+
+Point any VS Code AI extension at `http://127.0.0.1:8787/v1` with API key `uva-local`. The proxy is included as a custom model in VS Code settings -- see the `github.copilot.chat.customOAIModels` entry in the project config.
+
 ## API reference
+
+All endpoints are served by `uva-proxy` on port `8787`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/chat/completions` | OpenAI-compatible streaming chat completions |
-| `POST` | `/api/v1/responses` | Responses API with tool-call and multi-turn support |
-| `GET` | `/api/v1/models` | List all available models |
-| `PUT` | `/api/v1/session` | Update UvA session cookie (bearer-key auth, used by extension) |
-| `GET` | `/api/health` | Health check |
+| `POST` | `/v1/chat/completions` | OpenAI-compatible streaming chat completions |
+| `POST` | `/v1/responses` | Responses API with tool-call and multi-turn support |
+| `GET` | `/v1/models` | List all available models |
+| `GET` | `/health` | Health check |
+| `*` | `/dashboard/` | Web dashboard (HTML/CSS/JS) |
+| `*` | `/api/dashboard/…` | Dashboard REST API (keys, users, grading, etc.) |
 
 ## Roadmap
 
-Planned features for upcoming releases:
-
-- **Built-in chat UI** -- A full chat interface directly in the dashboard, replacing UvA's limited one. Conversation history, model switching mid-chat, artifact rendering, and image generation support.
-- **Advanced grading pipeline** -- Rubric parsing, file upload (PDF/DOCX), batch auto-grading with configurable models, score distribution visualization, and CSV/Excel export.
 - **Rate limiting and quotas** -- Per-key rate limits and daily token quotas to prevent abuse and share access fairly.
-- **Conversation history** -- Persistent chat history stored in Supabase, searchable and resumable across sessions.
 - **Multi-user sharing** -- Team API keys and shared grading sessions for course staff.
 - **Streaming tool calls** -- Real-time streaming of tool-call arguments as they're generated, instead of buffering the full response.
 - **Image and file support** -- Vision model support (image inputs) and file attachment handling through the API.
 - **Firefox extension** -- Port the Chrome extension to Firefox with WebExtension APIs.
+- **Grading pipeline improvements** -- Rubric parsing from PDF/DOCX, batch auto-grading with configurable models, score distribution visualization, and CSV/Excel export.
 
 ## Disclaimer
 

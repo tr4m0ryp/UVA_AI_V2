@@ -24,6 +24,7 @@ typedef struct {
     char         *body;
     size_t        body_len;
     int           client_fd;
+    int           fd_claimed;   /* set to 1 if handler takes ownership of fd */
 } http_request_t;
 
 /* Start the HTTP server. Blocks until shutdown. Returns 0 on success. */

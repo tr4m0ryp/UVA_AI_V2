@@ -3,6 +3,7 @@
 
 #include "database.h"
 
+#define APIKEY_LOCAL      "uva-local"
 #define APIKEY_PREFIX     "uva-sk-"
 #define APIKEY_PREFIX_LEN 7
 #define APIKEY_RAW_BYTES  32

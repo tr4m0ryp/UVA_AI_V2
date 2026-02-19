@@ -20,6 +20,8 @@ typedef struct {
     char    name[DB_MAX_NAME];
     char    uva_session[DB_MAX_COOKIE];
     char    dashboard_token[DB_MAX_TOKEN];
+    char    github_token[DB_MAX_NAME];
+    char    github_login[64];
 } db_user_t;
 
 typedef struct {
@@ -71,6 +73,8 @@ int db_user_find_by_token(const char *token, db_user_t *out);
 int db_user_update_session(int64_t user_id, const char *session);
 int db_user_set_token(int64_t user_id, const char *token);
 int db_user_clear_token(int64_t user_id);
+int db_user_set_github(int64_t user_id, const char *token, const char *login);
+int db_user_clear_github(int64_t user_id);
 
 /* API Key CRUD */
 int db_key_create(const db_api_key_t *key, int64_t *out_id);

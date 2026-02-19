@@ -141,7 +141,8 @@ static void *handle_connection(void *arg)
     }
 
     free(req.body);
-    platform_close_socket(fd);
+    if (!req.fd_claimed)
+        platform_close_socket(fd);
     return NULL;
 }
 
