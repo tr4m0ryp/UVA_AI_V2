@@ -45,19 +45,14 @@ vendor/open-webui/build/
 vendor/open-webui/backend/data/
 vendor/open-webui/.venv/
 
-# ─── Upstream extracted source: ignore generated/installed artefacts only ─────
-upstream/extracted/apps/client/node_modules/
-upstream/extracted/apps/client/.next/
-upstream/extracted/apps/client/tsconfig.tsbuildinfo
+# ─── Upstream reverse-engineering artefacts (not needed by users) ─────────────
+upstream/bundles/
+upstream/capture/
+upstream/extracted/
 
-# ─── Captured traffic (potentially sensitive) ─────────────────────────────────
-upstream/capture/captured_traffic.json
-upstream/capture/capture_summary.txt
-
-# ─── Source maps and prettified bundle duplicates ─────────────────────────────
-upstream/bundles/*.map
-upstream/bundles/*_pretty.js
-upstream/bundles/api_*.txt
+# ─── Test / development scaffolding ───────────────────────────────────────────
+services/proxy/test_grading/
+services/proxy/test_chat.sh
 
 # ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
