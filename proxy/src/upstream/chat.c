@@ -3,6 +3,7 @@
 #include "translator.h"
 #include "think_parser.h"
 #include "stream.h"
+#include "platform.h"
 #include "apikey.h"
 #include "database.h"
 #include <stdio.h>
@@ -42,15 +43,19 @@ static void on_think_emit(const char *text, int is_reasoning, void *userdata)
     chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
     ctx->completion_chars += (int)strlen(text);
 
-    struct json_object *obj = json_object_new_object();
-    json_object_object_add(obj, "type",
-        json_object_new_string(is_reasoning ? "thinking" : "content"));
-    json_object_object_add(obj, "text",
-        json_object_new_string(text));
-    const char *str = json_object_to_json_string_ext(obj,
-        JSON_C_TO_STRING_PLAIN);
-    response_send_sse_data(ctx->client_fd, str);
-    json_object_put(obj);
+    if (is_reasoning) {
+        char *json = translate_stream_chunk_ex(text, "reasoning_content",
+                         ctx->model, ctx->completion_id, 0);
+        if (json) {
+            char line[8192];
+            int n = snprintf(line, sizeof(line), "data: %s\n\n", json);
+            platform_send(ctx->client_fd, line, (size_t)n);
+            free(json);
+        }
+    } else {
+        stream_emit_chunk(ctx->client_fd, ctx->model,
+                          ctx->completion_id, text, 0);
+    }
 }
 
 static void on_token(const char *token, void *userdata)
@@ -236,8 +241,10 @@ void handle_chat_completions(http_request_t *req)
         return;
     }
 
+    fprintf(stderr, "  [chat] effective model: %s\n", model_buf);
+
     if (streaming)
-        response_start_sse(req->client_fd);
+        stream_emit_headers(req->client_fd);
 
     /* Send to upstream using the API key's session cookie */
     buffer_t resp_buf;
@@ -253,6 +260,9 @@ void handle_chat_completions(http_request_t *req)
         think_parser_free(ctx.think);
     }
 
+    fprintf(stderr, "  [chat] upstream HTTP %d (%d chars)\n",
+            http_code, ctx.completion_chars);
+
     if (http_code < 0 || http_code >= 500) {
         if (!streaming) {
             char msg[256];
@@ -265,21 +275,16 @@ void handle_chat_completions(http_request_t *req)
     }
 
     if (streaming) {
-        response_end_sse(req->client_fd);
+        stream_emit_chunk(req->client_fd, model_buf, cid, NULL, 0);
+        stream_emit_done(req->client_fd);
     } else {
         char *reasoning = NULL;
         char *clean = think_strip(
             ctx.accum.data ? ctx.accum.data : "", &reasoning);
-        struct json_object *resp = json_object_new_object();
-        json_object_object_add(resp, "thinking",
-            json_object_new_string(
-                reasoning && *reasoning ? reasoning : ""));
-        json_object_object_add(resp, "content",
-            json_object_new_string(clean ? clean : ""));
-        const char *str = json_object_to_json_string_ext(resp,
-            JSON_C_TO_STRING_PLAIN);
-        response_send_json(req->client_fd, 200, str);
-        json_object_put(resp);
+        char *json_resp = translate_response_ex(clean, reasoning,
+                                                 model_buf, cid);
+        response_send_json(req->client_fd, 200, json_resp);
+        free(json_resp);
         free(clean);
         free(reasoning);
     }

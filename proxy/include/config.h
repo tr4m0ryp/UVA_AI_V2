@@ -5,7 +5,7 @@
 
 #define DEFAULT_LISTEN_PORT    8787
 #define DEFAULT_BASE_URL       "https://aichat.uva.nl"
-#define DEFAULT_MODEL          "claude-sonnet-4.5"
+#define DEFAULT_MODEL          "gpt-4.1"
 #define CONFIG_FILE            "proxy.env"
 #define MAX_COOKIE_LEN         4096
 #define MAX_URL_LEN            512
