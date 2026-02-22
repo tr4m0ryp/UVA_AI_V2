@@ -152,23 +152,22 @@ struct json_object *resp_input_to_messages(struct json_object *input,
                 json_object_array_add(messages, msg);
 
             } else if (strcmp(type, "function_call") == 0) {
-                /* Convert assistant's prior tool call to a message so
-                 * the model sees what it previously requested. */
-                struct json_object *fn_obj, *args_obj, *cid_obj;
+                /* Format as <tool_call> XML so the model sees the
+                 * same delimiters it should output (in-context learning). */
+                struct json_object *fn_obj, *args_obj;
                 const char *fn = "unknown";
-                const char *args = "";
-                const char *cid = "";
+                const char *args = "{}";
                 if (json_object_object_get_ex(item, "name", &fn_obj))
                     fn = json_object_get_string(fn_obj);
                 if (json_object_object_get_ex(item, "arguments", &args_obj))
                     args = json_object_get_string(args_obj);
-                if (json_object_object_get_ex(item, "call_id", &cid_obj))
-                    cid = json_object_get_string(cid_obj);
 
                 char content[RESP_MAX_ARGS + 512];
                 snprintf(content, sizeof(content),
-                    "[Called tool \"%s\" (call_id: %s) with arguments: %s]",
-                    fn, cid, args);
+                    "<tool_call>\n"
+                    "{\"name\": \"%s\", \"arguments\": %s}\n"
+                    "</tool_call>",
+                    fn, args);
 
                 struct json_object *msg = json_object_new_object();
                 json_object_object_add(msg, "role",
@@ -187,22 +186,18 @@ struct json_object *resp_input_to_messages(struct json_object *input,
     return messages;
 }
 
-/* Scan backward for a preceding function_call assistant message
- * with matching call_id; returns function name or NULL. */
+/* Scan backward for a preceding assistant message with a <tool_call>
+ * block containing the function name. Returns name or NULL. */
 static const char *find_func_name_for_call(struct json_object *messages,
                                             int pos, const char *call_id)
 {
-    if (!call_id || !call_id[0]) return NULL;
+    (void)call_id; /* call_id not in tool_call XML; match by proximity */
 
-    /* The assistant message with the tool call should be right before
-     * the function_call_output, but scan a few items back to be safe. */
     for (int j = pos - 1; j >= 0 && j >= pos - 4; j--) {
         struct json_object *prev = json_object_array_get_idx(messages,
                                                               (size_t)j);
         if (!prev) continue;
 
-        /* Check for our synthetic assistant message format:
-         * [Called tool "name" (call_id: xxx) ...] */
         struct json_object *role_o, *content_o;
         if (!json_object_object_get_ex(prev, "role", &role_o))
             continue;
@@ -214,24 +209,24 @@ static const char *find_func_name_for_call(struct json_object *messages,
         const char *c = json_object_get_string(content_o);
         if (!c) continue;
 
-        /* Match on call_id substring */
-        if (strstr(c, call_id)) {
-            /* Extract name from [Called tool "NAME" ...] */
-            const char *q1 = strstr(c, "Called tool \"");
-            if (q1) {
-                q1 += 13; /* skip: Called tool " */
-                const char *q2 = strchr(q1, '"');
-                if (q2) {
-                    static __thread char name_buf[RESP_MAX_NAME];
-                    size_t nlen = (size_t)(q2 - q1);
-                    if (nlen >= RESP_MAX_NAME)
-                        nlen = RESP_MAX_NAME - 1;
-                    memcpy(name_buf, q1, nlen);
-                    name_buf[nlen] = '\0';
-                    return name_buf;
-                }
-            }
-        }
+        /* Look for "name": "..." in the tool_call block */
+        const char *tc = strstr(c, "<tool_call>");
+        if (!tc) continue;
+
+        const char *nq = strstr(tc, "\"name\"");
+        if (!nq) continue;
+        nq = strchr(nq + 6, '"');
+        if (!nq) continue;
+        nq++; /* skip opening quote */
+        const char *ne = strchr(nq, '"');
+        if (!ne) continue;
+
+        static __thread char name_buf[RESP_MAX_NAME];
+        size_t nlen = (size_t)(ne - nq);
+        if (nlen >= RESP_MAX_NAME) nlen = RESP_MAX_NAME - 1;
+        memcpy(name_buf, nq, nlen);
+        name_buf[nlen] = '\0';
+        return name_buf;
     }
     return NULL;
 }
@@ -264,18 +259,20 @@ void resp_fold_tool_results(struct json_object *messages)
         if (json_object_object_get_ex(item, "output", &output_obj))
             output = json_object_get_string(output_obj);
 
-        /* Try to find the function name from the preceding call */
-        const char *fn = find_func_name_for_call(messages, i, call_id);
+        /* Format as <tool_response> XML for in-context learning.
+         * Use json-c to properly escape the output string. */
+        (void)find_func_name_for_call(messages, i, call_id);
+
+        struct json_object *out_str = json_object_new_string(output);
+        const char *escaped_out = json_object_to_json_string(out_str);
 
         char content[RESP_MAX_ARGS + 512];
-        if (fn) {
-            snprintf(content, sizeof(content),
-                     "[Result of tool \"%s\" (call_id: %s)]:\n%s",
-                     fn, call_id, output);
-        } else {
-            snprintf(content, sizeof(content),
-                     "[Tool result for %s]: %s", call_id, output);
-        }
+        snprintf(content, sizeof(content),
+                 "<tool_response>\n"
+                 "{\"call_id\": \"%s\", \"output\": %s}\n"
+                 "</tool_response>",
+                 call_id, escaped_out);
+        json_object_put(out_str);
 
         struct json_object *msg = json_object_new_object();
         json_object_object_add(msg, "role",

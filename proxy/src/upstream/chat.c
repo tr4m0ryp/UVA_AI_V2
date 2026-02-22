@@ -6,6 +6,9 @@
 #include "platform.h"
 #include "apikey.h"
 #include "database.h"
+#include "idgen.h"
+#include "thread_state.h"
+#include "chat_thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,22 +25,21 @@ void response_end_sse(int fd);
 /* actions.c */
 char *actions_get_or_create_thread(void);
 
-/*
- * Streaming context: receives upstream data, parses SSE tokens,
- * and forwards them as OpenAI-format SSE to the client fd.
- */
+/* chat_overrides.c */
+char *apply_apikey_overrides(const char *body, const db_api_key_t *ak,
+                              char *model_buf, size_t model_size);
+
 typedef struct {
     int              client_fd;
     const char      *model;
     char            *completion_id;
     stream_parser_t *parser;
     think_parser_t  *think;
-    buffer_t         accum; /* for non-streaming: accumulate full response */
+    buffer_t         accum;
     int              streaming;
     int              completion_chars;
 } chat_stream_ctx_t;
 
-/* Called by think_parser when it has classified a piece of text. */
 static void on_think_emit(const char *text, int is_reasoning, void *userdata)
 {
     chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
@@ -61,7 +63,6 @@ static void on_think_emit(const char *text, int is_reasoning, void *userdata)
 static void on_token(const char *token, void *userdata)
 {
     chat_stream_ctx_t *ctx = (chat_stream_ctx_t *)userdata;
-
     if (ctx->streaming) {
         think_parser_feed(ctx->think, token);
     } else {
@@ -77,72 +78,65 @@ static size_t upstream_stream_cb(const char *data, size_t len, void *userdata)
     return len;
 }
 
-/* Build a modified request body with API key overrides applied.
- * Injects system prompt and overrides model if API key provides them. */
-static char *apply_apikey_overrides(const char *body,
-                                    const db_api_key_t *ak,
-                                    char *model_buf, size_t model_size)
+/* Resolve thread state: reuse existing thread or create new one. */
+static int resolve_thread(const char *effective_body,
+                           struct json_object *parsed,
+                           const db_api_key_t *ak,
+                           const char *model,
+                           char **uva_body, int *is_incremental,
+                           char *conv_key_out)
 {
-    struct json_object *parsed = json_tokener_parse(body);
-    if (!parsed) return NULL;
-
-    /* Use client's model if present, fall back to key's model */
-    struct json_object *existing_model;
-    if (json_object_object_get_ex(parsed, "model", &existing_model)) {
-        snprintf(model_buf, model_size, "%s",
-            json_object_get_string(existing_model));
-    } else {
-        snprintf(model_buf, model_size, "%s", ak->model);
-        json_object_object_add(parsed, "model",
-            json_object_new_string(ak->model));
+    *is_incremental = 0;
+    conv_key_out[0] = '\0';
+    struct json_object *msgs;
+    if (!json_object_object_get_ex(parsed, "messages", &msgs)) {
+        char *tid = actions_get_or_create_thread();
+        *uva_body = translate_request(effective_body, tid);
+        free(tid);
+        return *uva_body ? 0 : -1;
     }
 
-    /* Inject system prompt at front of messages */
-    if (ak->system_prompt[0]) {
-        struct json_object *msgs;
-        if (json_object_object_get_ex(parsed, "messages", &msgs)) {
-            struct json_object *sys_msg = json_object_new_object();
-            json_object_object_add(sys_msg, "role",
-                json_object_new_string("system"));
-            json_object_object_add(sys_msg, "content",
-                json_object_new_string(ak->system_prompt));
-            json_object_array_put_idx(msgs,
-                (size_t)json_object_array_length(msgs), NULL);
-            /* Shift all elements right by 1 */
-            int len = (int)json_object_array_length(msgs);
-            for (int i = len - 1; i > 0; i--)
-                json_object_array_put_idx(msgs, (size_t)i,
-                    json_object_get(json_object_array_get_idx(msgs,
-                        (size_t)(i - 1))));
-            json_object_array_put_idx(msgs, 0, sys_msg);
+    const char *first_user = chat_first_user_content(msgs);
+    const char *last_user = chat_last_user_content(msgs);
+    int msg_count = chat_count_messages(msgs);
+
+    char conv_key[65];
+    if (!first_user || chat_make_conv_key(ak->id, model, first_user,
+                                           conv_key, sizeof(conv_key)) != 0) {
+        char *tid = actions_get_or_create_thread();
+        *uva_body = translate_request(effective_body, tid);
+        free(tid);
+        return *uva_body ? 0 : -1;
+    }
+
+    snprintf(conv_key_out, 65, "%s", conv_key);
+    thread_state_t ts;
+    if (thread_state_find(conv_key, &ts) == 0 && msg_count > ts.message_count) {
+        /* Incremental mode: reuse existing UvA thread */
+        fprintf(stderr, "  [chat] incremental mode: thread=%s msgs=%d->%d\n",
+                ts.uva_thread_id, ts.message_count, msg_count);
+        *uva_body = translate_request_incremental(last_user, "user",
+                                                    ts.uva_thread_id, NULL);
+        if (*uva_body) {
+            *is_incremental = 1;
+            return 0;
         }
     }
 
-    /* Pass through parameters for translate_request to pick up */
-    if (ak->temperature >= 0)
-        json_object_object_add(parsed, "temperature",
-            json_object_new_double(ak->temperature));
-    if (ak->top_p >= 0)
-        json_object_object_add(parsed, "top_p",
-            json_object_new_double(ak->top_p));
-    if (ak->max_tokens > 0)
-        json_object_object_add(parsed, "max_tokens",
-            json_object_new_int(ak->max_tokens));
-    if (ak->frequency_penalty != 0.0)
-        json_object_object_add(parsed, "frequency_penalty",
-            json_object_new_double(ak->frequency_penalty));
-    if (ak->presence_penalty != 0.0)
-        json_object_object_add(parsed, "presence_penalty",
-            json_object_new_double(ak->presence_penalty));
-    if (ak->reasoning_effort[0])
-        json_object_object_add(parsed, "reasoning_effort",
-            json_object_new_string(ak->reasoning_effort));
+    char *tid = actions_get_or_create_thread();
+    *uva_body = translate_request(effective_body, tid);
+    fprintf(stderr, "  [chat] full mode: new thread=%s msgs=%d\n",
+            tid, msg_count);
+    thread_state_t new_ts;
+    memset(&new_ts, 0, sizeof(new_ts));
+    snprintf(new_ts.conv_key, sizeof(new_ts.conv_key), "%s", conv_key);
+    snprintf(new_ts.uva_thread_id, sizeof(new_ts.uva_thread_id), "%s", tid);
+    snprintf(new_ts.model, sizeof(new_ts.model), "%s", model);
+    new_ts.message_count = msg_count;
+    thread_state_save(&new_ts);
 
-    const char *str = json_object_to_json_string_ext(parsed,
-        JSON_C_TO_STRING_PLAIN);
-    char *result = strdup(str);
-    json_object_put(parsed);
-    return result;
+    free(tid);
+    return *uva_body ? 0 : -1;
 }
 
 void handle_chat_completions(http_request_t *req)
@@ -157,7 +151,6 @@ void handle_chat_completions(http_request_t *req)
         return;
     }
 
-    /* Authenticate via API key (mandatory) */
     db_api_key_t resolved_key;
     const char *auth = request_get_header(req, "Authorization");
     if (!auth) {
@@ -175,7 +168,6 @@ void handle_chat_completions(http_request_t *req)
     fprintf(stderr, "  [chat] API key: %s (model: %s)\n",
             resolved_key.key_prefix, resolved_key.model);
 
-    /* Prepare request body: apply API key overrides */
     char model_buf[DB_MAX_MODEL];
     char *effective_body = apply_apikey_overrides(req->body, &resolved_key,
                                                   model_buf, sizeof(model_buf));
@@ -184,7 +176,6 @@ void handle_chat_completions(http_request_t *req)
         return;
     }
 
-    /* Parse to check for stream flag and model */
     struct json_object *parsed = json_tokener_parse(effective_body);
     if (!parsed) {
         free(effective_body);
@@ -197,34 +188,26 @@ void handle_chat_completions(http_request_t *req)
     if (json_object_object_get_ex(parsed, "stream", &stream_obj))
         streaming = json_object_get_boolean(stream_obj);
 
-    json_object_put(parsed);
-
-    /* Get or create a thread ID */
-    char *thread_id = actions_get_or_create_thread();
-    if (!thread_id) {
+    char *uva_body = NULL;
+    int is_incremental = 0;
+    char conv_key[65];
+    if (resolve_thread(effective_body, parsed, &resolved_key,
+                        model_buf, &uva_body, &is_incremental,
+                        conv_key) != 0) {
+        json_object_put(parsed);
         free(effective_body);
-        response_send_error(req->client_fd, 502,
-            "Failed to obtain chat thread from UvA");
-        return;
-    }
-
-    /* Translate to UvA format */
-    char *uva_body = translate_request(effective_body, thread_id);
-    free(thread_id);
-    free(effective_body);
-
-    if (!uva_body) {
         response_send_error(req->client_fd, 500,
             "Failed to translate request");
         return;
     }
 
-    /* Generate completion ID */
+    json_object_put(parsed);
+    free(effective_body);
+
     char cid[64];
     snprintf(cid, sizeof(cid), "chatcmpl-%lx%04x",
              (unsigned long)time(NULL), rand() & 0xFFFF);
 
-    /* Set up streaming context */
     chat_stream_ctx_t ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.client_fd = req->client_fd;
@@ -246,13 +229,11 @@ void handle_chat_completions(http_request_t *req)
     if (streaming)
         stream_emit_headers(req->client_fd);
 
-    /* Send to upstream using the API key's session cookie */
     buffer_t resp_buf;
     int http_code = upstream_chat_with_cookie(uva_body, strlen(uva_body),
         resolved_key.user_session, upstream_stream_cb, &ctx, &resp_buf);
     free(uva_body);
 
-    /* Flush parsers */
     stream_parser_finish(ctx.parser);
     stream_parser_free(ctx.parser);
     if (ctx.think) {
@@ -262,6 +243,16 @@ void handle_chat_completions(http_request_t *req)
 
     fprintf(stderr, "  [chat] upstream HTTP %d (%d chars)\n",
             http_code, ctx.completion_chars);
+
+    if (is_incremental && conv_key[0]) {
+        if (http_code < 0 || http_code >= 400) {
+            fprintf(stderr, "  [chat] incremental failed (HTTP %d), "
+                    "clearing thread state\n", http_code);
+            thread_state_delete(conv_key);
+        } else if (http_code >= 200 && http_code < 300) {
+            thread_state_incr(conv_key);
+        }
+    }
 
     if (http_code < 0 || http_code >= 500) {
         if (!streaming) {
@@ -289,7 +280,6 @@ void handle_chat_completions(http_request_t *req)
         free(reasoning);
     }
 
-    /* Log usage: estimate tokens from character count (~4 chars/token) */
     if (http_code >= 0 && http_code < 500) {
         int est_prompt = (int)(req->body_len / 4);
         int est_completion = ctx.completion_chars / 4;

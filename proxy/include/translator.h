@@ -28,6 +28,16 @@ char *models_list_json(void);
  * Returns a new JSON string (caller frees), or NULL on error. */
 char *translate_request(const char *openai_body, const char *thread_id);
 
+/* Build an incremental (continuation) UvA request body.
+ * Sends only the new message with isNewChat:false on an existing thread.
+ * content/role: the new message to send.
+ * thread_id: existing UvA thread ID.
+ * model: UvA model name, or NULL for empty overrides (continuation).
+ * Returns a new JSON string (caller frees), or NULL on error. */
+char *translate_request_incremental(const char *content, const char *role,
+                                     const char *thread_id,
+                                     const char *model);
+
 /* Build an OpenAI chat completion response (non-streaming).
  * content is the full assistant message text.
  * model is the model name used. Caller frees returned string. */

@@ -5,6 +5,7 @@
 #include "database.h"
 #include "project.h"
 #include "responses.h"
+#include "thread_state.h"
 #include "webui.h"
 #include "platform.h"
 #include <stdio.h>
@@ -75,6 +76,14 @@ int main(int argc, char **argv)
     /* Initialize response state schema */
     if (resp_state_init_schema() != 0) {
         fprintf(stderr, "Failed to initialize response state schema.\n");
+        db_close();
+        platform_cleanup();
+        return 1;
+    }
+
+    /* Initialize thread state schema */
+    if (thread_state_init_schema() != 0) {
+        fprintf(stderr, "Failed to initialize thread state schema.\n");
         db_close();
         platform_cleanup();
         return 1;

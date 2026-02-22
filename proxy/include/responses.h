@@ -13,6 +13,11 @@
 #define RESP_MAX_MODEL       128
 #define RESP_MAX_INSTRUCTIONS 8192
 
+/* tool_choice values */
+#define RESP_TC_AUTO     0
+#define RESP_TC_NONE     1
+#define RESP_TC_REQUIRED 2
+
 typedef struct {
     char name[RESP_MAX_NAME];
     char arguments[RESP_MAX_ARGS];
@@ -34,6 +39,7 @@ typedef struct {
     int                has_tools;
     struct json_object *tools_json;     /* borrowed, do not free */
     int                stream;
+    int                tool_choice;     /* RESP_TC_AUTO/NONE/REQUIRED */
     char               previous_response_id[RESP_ID_LEN];
     struct json_object *input_json;     /* borrowed, do not free */
     double             temperature;     /* -1 = not set */
@@ -57,8 +63,10 @@ struct json_object *resp_input_to_messages(struct json_object *input,
                                            const char *instructions);
 void resp_fold_tool_results(struct json_object *messages);
 
-/* Tool XML injection and parsing */
-char *resp_tools_to_xml(struct json_object *tools_json, const char *model);
+/* Tool prompt building (Hermes-style) */
+char *resp_build_tool_prompt(struct json_object *tools_json);
+
+/* Tool call parsing */
 int   resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
                             int max_calls);
 
@@ -66,15 +74,9 @@ int   resp_parse_tool_calls(const char *text, resp_tool_call_t *out,
 int resp_handle_text_stream(int fd, const char *uva_body,
                             const char *cookie, const char *model,
                             resp_result_t *result);
-int resp_handle_tool_path(int fd, const char *uva_body,
-                          const char *cookie, const char *model,
-                          resp_result_t *result);
 
-/* Buffered (non-streaming) handler paths */
+/* Buffered (non-streaming) handler */
 int resp_handle_text_buffered(const char *uva_body,
-                              const char *cookie, const char *model,
-                              resp_result_t *result);
-int resp_handle_tool_buffered(const char *uva_body,
                               const char *cookie, const char *model,
                               resp_result_t *result);
 
