@@ -43,15 +43,15 @@ void dashboard_serve_static(http_request_t *req)
         return;
     }
 
-    /* Build filesystem path */
+    /* Build filesystem path (dashboard lives at repo root, one level up from proxy CWD) */
     char filepath[1024];
-    snprintf(filepath, sizeof(filepath), "dashboard/%s", rel);
+    snprintf(filepath, sizeof(filepath), "../dashboard/%s", rel);
 
     /* Check if file exists */
     struct stat st;
     if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
         /* SPA fallback: serve index.html for non-file paths */
-        snprintf(filepath, sizeof(filepath), "dashboard/index.html");
+        snprintf(filepath, sizeof(filepath), "../dashboard/index.html");
         if (stat(filepath, &st) != 0) {
             response_send_error(req->client_fd, 404, "Not found");
             return;
