@@ -12,7 +12,7 @@ BIN      = uva-proxy
 # Platform detection
 ifeq ($(UNAME),Linux)
   CFLAGS      += -D_GNU_SOURCE -DPLATFORM_LINUX
-  PLATFORM_SRC = src/platform/linux.c
+  PLATFORM_SRC = src/core/platform/linux.c
   LDFLAGS      = -lcurl -ljson-c -lssl -lcrypto -lpthread -lutil -lz -ldl -lm
   ifeq ($(STATIC),1)
     LDFLAGS = -static -lcurl -ljson-c -lssl -lcrypto -lpthread -lutil -lz -ldl -lm
@@ -20,7 +20,7 @@ ifeq ($(UNAME),Linux)
 endif
 ifeq ($(UNAME),Darwin)
   CFLAGS      += -D_GNU_SOURCE -DPLATFORM_MACOS
-  PLATFORM_SRC = src/platform/macos.c
+  PLATFORM_SRC = src/core/platform/macos.c
   LDFLAGS      = -lcurl -ljson-c -lssl -lcrypto -lpthread -lz -lm
   # Homebrew paths
   ifneq ($(wildcard /opt/homebrew/include/.),)
@@ -34,21 +34,21 @@ endif
 ifeq ($(findstring MINGW,$(UNAME)),MINGW)
   CC           = gcc
   CFLAGS      += -DPLATFORM_WINDOWS
-  PLATFORM_SRC = src/platform/windows.c
+  PLATFORM_SRC = src/core/platform/windows.c
   LDFLAGS      = -static -lcurl -ljson-c -lssl -lcrypto -lws2_32 -lz -lm
   BIN          = uva-proxy.exe
 endif
 ifeq ($(findstring MSYS,$(UNAME)),MSYS)
   CC           = gcc
   CFLAGS      += -DPLATFORM_WINDOWS
-  PLATFORM_SRC = src/platform/windows.c
+  PLATFORM_SRC = src/core/platform/windows.c
   LDFLAGS      = -static -lcurl -ljson-c -lssl -lcrypto -lws2_32 -lz -lm
   BIN          = uva-proxy.exe
 endif
 
 # Discover all .c files except platform-specific ones, then add common + target
-SRC = $(shell find src/ -name '*.c' ! -path 'src/platform/*') \
-      src/platform/common.c $(PLATFORM_SRC)
+SRC = $(shell find src/ -name '*.c' ! -path 'src/core/platform/*') \
+      src/core/platform/common.c $(PLATFORM_SRC)
 
 OBJ = $(patsubst src/%.c,$(BUILDDIR)/%.o,$(SRC))
 
