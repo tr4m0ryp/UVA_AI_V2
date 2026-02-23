@@ -1,5 +1,5 @@
-#include "webui_internal.h"
-#include "platform.h"
+#include "webui/webui_internal.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

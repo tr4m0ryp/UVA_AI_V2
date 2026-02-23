@@ -1,9 +1,9 @@
-#include "dashboard.h"
-#include "project.h"
-#include "database.h"
-#include "apikey.h"
-#include "vps.h"
-#include "server.h"
+#include "dashboard/dashboard.h"
+#include "database/project.h"
+#include "database/database.h"
+#include "apikey/apikey.h"
+#include "vps/vps.h"
+#include "server/server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

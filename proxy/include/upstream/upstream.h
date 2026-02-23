@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_UPSTREAM_H
 #define UVA_PROXY_UPSTREAM_H
 
-#include "config.h"
+#include "config/config.h"
 #include <stddef.h>
 #include <curl/curl.h>
 

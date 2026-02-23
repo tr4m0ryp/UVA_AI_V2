@@ -1,5 +1,5 @@
-#include "upstream.h"
-#include "config.h"
+#include "upstream/upstream.h"
+#include "config/config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

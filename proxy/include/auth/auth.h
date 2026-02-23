@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_AUTH_H
 #define UVA_PROXY_AUTH_H
 
-#include "config.h"
+#include "config/config.h"
 
 /* Run the browser-based login flow:
  * 1. Start temporary HTTP server on a random port

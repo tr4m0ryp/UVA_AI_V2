@@ -1,9 +1,9 @@
-#include "dashboard.h"
-#include "database.h"
-#include "server.h"
-#include "websocket.h"
-#include "webui.h"
-#include "platform.h"
+#include "dashboard/dashboard.h"
+#include "database/database.h"
+#include "server/server.h"
+#include "websocket/websocket.h"
+#include "webui/webui.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#include "websocket.h"
-#include "platform.h"
+#include "websocket/websocket.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <string.h>
 #include <openssl/sha.h>

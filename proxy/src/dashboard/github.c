@@ -1,8 +1,8 @@
-#include "dashboard.h"
-#include "database.h"
-#include "github.h"
-#include "config.h"
-#include "server.h"
+#include "dashboard/dashboard.h"
+#include "database/database.h"
+#include "github/github.h"
+#include "config/config.h"
+#include "server/server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

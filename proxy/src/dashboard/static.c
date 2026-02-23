@@ -1,6 +1,6 @@
-#include "dashboard.h"
-#include "server.h"
-#include "platform.h"
+#include "dashboard/dashboard.h"
+#include "server/server.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

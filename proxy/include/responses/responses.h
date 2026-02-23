@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_RESPONSES_H
 #define UVA_PROXY_RESPONSES_H
 
-#include "server.h"
+#include "server/server.h"
 #include <json-c/json.h>
 
 #define RESP_ID_LEN          22   /* "resp_" + 16 hex + null */
@@ -65,6 +65,7 @@ void resp_fold_tool_results(struct json_object *messages);
 
 /* Tool prompt building (Hermes-style) */
 char *resp_build_tool_prompt(struct json_object *tools_json);
+char *resp_build_tool_reminder(struct json_object *tools_json);
 
 /* Tool call parsing */
 int   resp_parse_tool_calls(const char *text, resp_tool_call_t *out,

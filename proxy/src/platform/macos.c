@@ -1,6 +1,6 @@
 #ifdef PLATFORM_MACOS
 
-#include "platform.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -3,7 +3,7 @@
 
 /* Shared state and helpers between webui/launcher.c and webui/process.c */
 
-#include "platform.h"
+#include "platform/platform.h"
 
 #define WEBUI_PATH_MAX   1024
 #define WEBUI_BUF_MAX    (WEBUI_PATH_MAX + 64)

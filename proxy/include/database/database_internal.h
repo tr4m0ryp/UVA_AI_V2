@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_DATABASE_INTERNAL_H
 #define UVA_PROXY_DATABASE_INTERNAL_H
 
-#include "sqlite3.h"
+#include "database/sqlite3.h"
 #include <pthread.h>
 
 /* Global database handle and mutex, defined in database.c */

@@ -1,11 +1,11 @@
-#include "auth_internal.h"
-#include "config.h"
-#include "platform.h"
+#include "auth/auth_internal.h"
+#include "config/config.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sqlite3.h>
+#include "database/sqlite3.h"
 #include <openssl/evp.h>
 
 #define PATH_MAX_LEN  512

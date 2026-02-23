@@ -1,8 +1,8 @@
-#include "dashboard.h"
-#include "dashboard_internal.h"
-#include "database.h"
-#include "upstream.h"
-#include "server.h"
+#include "dashboard/dashboard.h"
+#include "dashboard/dashboard_internal.h"
+#include "database/database.h"
+#include "upstream/upstream.h"
+#include "server/server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

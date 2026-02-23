@@ -1,6 +1,6 @@
-#include "translator.h"
-#include "idgen.h"
-#include "upstream.h"   /* buffer_t */
+#include "translator/translator.h"
+#include "utils/idgen.h"
+#include "upstream/upstream.h"   /* buffer_t */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,7 +132,6 @@ char *translate_request(const char *openai_body, const char *thread_id)
 
         buffer_t combined;
         buffer_init(&combined);
-        const char *final_role = "user";
         const char *final_content = "";
 
         for (int i = 0; i < len; i++) {
@@ -146,22 +145,40 @@ char *translate_request(const char *openai_body, const char *thread_id)
                 c = extract_content(content_o);
 
             if (i == len - 1) {
-                final_role = r;
                 final_content = c;
             } else if (c && c[0]) {
                 if (combined.size > 0)
                     buffer_append(&combined, "\n\n", 2);
+
+                /* Prepend role label for context preservation */
+                const char *label = "[USER]";
+                if (r && strcmp(r, "system") == 0)
+                    label = "[SYSTEM]";
+                else if (r && strcmp(r, "developer") == 0)
+                    label = "[SYSTEM]";
+                else if (r && strcmp(r, "assistant") == 0)
+                    label = "[ASSISTANT]";
+                else if (c && strstr(c, "<tool_response>"))
+                    label = "[TOOL RESULT]";
+
+                buffer_append(&combined, label, strlen(label));
+                buffer_append(&combined, "\n", 1);
                 buffer_append(&combined, c, strlen(c));
             }
         }
 
+        /* Always send as "user" role to UvA */
         if (combined.size > 0 && final_content[0]) {
             buffer_append(&combined, "\n\n", 2);
+            buffer_append(&combined, "[USER]\n", 7);
             buffer_append(&combined, final_content, strlen(final_content));
-            last_msg = make_uva_message(final_role, combined.data,
+            last_msg = make_uva_message("user", combined.data,
+                                        last_msg_id);
+        } else if (combined.size > 0) {
+            last_msg = make_uva_message("user", combined.data,
                                         last_msg_id);
         } else {
-            last_msg = make_uva_message(final_role, final_content,
+            last_msg = make_uva_message("user", final_content,
                                         last_msg_id);
         }
         buffer_free(&combined);

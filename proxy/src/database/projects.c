@@ -1,6 +1,6 @@
-#include "project.h"
-#include "database.h"
-#include "database_internal.h"
+#include "database/project.h"
+#include "database/database.h"
+#include "database/database_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

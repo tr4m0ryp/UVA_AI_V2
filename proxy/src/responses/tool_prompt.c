@@ -1,5 +1,5 @@
-#include "responses.h"
-#include "responses_internal.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,19 +23,24 @@ char *resp_build_tool_prompt(struct json_object *tools_json)
     if (count == 0)
         return NULL;
 
-    /* Estimate size: header + tools + footer */
-    size_t cap = 4096;
+    size_t cap = 8192;
     char *buf = malloc(cap);
     if (!buf) return NULL;
     size_t pos = 0;
 
-    /* Header */
+    /* Header: agent identity framing */
     static const char header[] =
-        "You are a function-calling AI model. You are provided with "
-        "function signatures within <tools></tools> XML tags. You may "
-        "call one or more functions to assist with the user query. Do "
-        "not make assumptions about what values to plug into functions."
-        "\n\nHere are the available tools:\n<tools>\n";
+        "You are an autonomous coding agent. You operate in a loop: "
+        "receive a task or tool result, decide the next action, call "
+        "the appropriate tool, and continue until the task is fully "
+        "complete.\n"
+        "You MUST use tools to interact with the environment. You "
+        "cannot run commands, read files, or modify anything without "
+        "calling a tool. Do not describe what you would do -- do it.\n"
+        "Plan before each tool call. After receiving a tool result, "
+        "evaluate whether the task is done. If not, call the next "
+        "tool immediately.\n\n"
+        "Here are the available tools:\n<tools>\n";
 
     size_t hlen = sizeof(header) - 1;
     if (pos + hlen >= cap) {
@@ -107,18 +112,38 @@ char *resp_build_tool_prompt(struct json_object *tools_json)
         json_object_put(out_tool);
     }
 
-    /* Footer */
+    /* Footer: format instruction + few-shot examples */
     static const char footer[] =
         "</tools>\n\n"
-        "For each function call, return a <tool_call> block with a JSON "
-        "object containing \"name\" and \"arguments\":\n"
+        "To call a tool, respond with a <tool_call> block containing "
+        "JSON with \"name\" and \"arguments\" keys:\n\n"
         "<tool_call>\n"
-        "{\"name\": \"function_name\", \"arguments\": "
-        "{\"param1\": \"value1\"}}\n"
+        "{\"name\": \"TOOL_NAME\", \"arguments\": {ARGS}}\n"
         "</tool_call>\n\n"
-        "You may output multiple <tool_call> blocks if needed.\n"
-        "If the user's request does not require tool use, respond "
-        "normally with plain text -- do not wrap text in tags.\n";
+        "RULES:\n"
+        "- Respond ONLY with <tool_call> blocks when action is needed\n"
+        "- No text before or around <tool_call> blocks\n"
+        "- Only use plain text after ALL actions are complete\n\n"
+        "EXAMPLES:\n\n"
+        "User: List the files in the current directory\n"
+        "Response:\n"
+        "<tool_call>\n"
+        "{\"name\": \"exec_command\", \"arguments\": "
+        "{\"command\": [\"bash\", \"-lc\", \"ls -la\"]}}\n"
+        "</tool_call>\n\n"
+        "User: Read the contents of main.py\n"
+        "Response:\n"
+        "<tool_call>\n"
+        "{\"name\": \"exec_command\", \"arguments\": "
+        "{\"command\": [\"bash\", \"-lc\", \"cat main.py\"]}}\n"
+        "</tool_call>\n\n"
+        "User: Create hello.py with a hello world program\n"
+        "Response:\n"
+        "<tool_call>\n"
+        "{\"name\": \"exec_command\", \"arguments\": "
+        "{\"command\": [\"bash\", \"-lc\", "
+        "\"printf 'print(\\\"Hello, world!\\\")\\n' > hello.py\"]}}\n"
+        "</tool_call>\n";
 
     size_t flen = sizeof(footer) - 1;
     if (pos + flen + 1 >= cap) {
@@ -130,5 +155,66 @@ char *resp_build_tool_prompt(struct json_object *tools_json)
     pos += flen;
     buf[pos] = '\0';
 
+    return buf;
+}
+
+/*
+ * Build a compact tool reminder for retry prompts.
+ * Lists tool names only (no full schemas) with format reminder.
+ * Returns malloc'd string; caller frees.
+ */
+char *resp_build_tool_reminder(struct json_object *tools_json)
+{
+    if (!tools_json || !json_object_is_type(tools_json, json_type_array))
+        return NULL;
+    int count = (int)json_object_array_length(tools_json);
+    if (count == 0)
+        return NULL;
+
+    size_t cap = 2048;
+    char *buf = malloc(cap);
+    if (!buf) return NULL;
+    size_t pos = 0;
+
+    static const char prefix[] =
+        "Available tools: ";
+    memcpy(buf, prefix, sizeof(prefix) - 1);
+    pos = sizeof(prefix) - 1;
+
+    for (int i = 0; i < count; i++) {
+        struct json_object *tool = json_object_array_get_idx(
+            tools_json, (size_t)i);
+        struct json_object *src = tool;
+        struct json_object *func_obj;
+        if (json_object_object_get_ex(tool, "function", &func_obj))
+            src = func_obj;
+        struct json_object *name_obj;
+        if (!json_object_object_get_ex(src, "name", &name_obj))
+            continue;
+        const char *name = json_object_get_string(name_obj);
+        if (!name) continue;
+        size_t nlen = strlen(name);
+        if (pos + nlen + 4 >= cap) {
+            cap = pos + nlen + 1024;
+            buf = realloc(buf, cap);
+            if (!buf) return NULL;
+        }
+        if (i > 0) { buf[pos++] = ','; buf[pos++] = ' '; }
+        memcpy(buf + pos, name, nlen);
+        pos += nlen;
+    }
+
+    static const char suffix[] =
+        "\nUse <tool_call>{\"name\":\"...\",\"arguments\":{...}}"
+        "</tool_call> format.";
+    size_t slen = sizeof(suffix) - 1;
+    if (pos + slen + 1 >= cap) {
+        cap = pos + slen + 64;
+        buf = realloc(buf, cap);
+        if (!buf) return NULL;
+    }
+    memcpy(buf + pos, suffix, slen);
+    pos += slen;
+    buf[pos] = '\0';
     return buf;
 }

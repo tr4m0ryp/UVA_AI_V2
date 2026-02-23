@@ -1,8 +1,8 @@
-#include "browser_monitor.h"
-#include "auth_internal.h"
-#include "upstream.h"
-#include "config.h"
-#include "platform.h"
+#include "auth/browser_monitor.h"
+#include "auth/auth_internal.h"
+#include "upstream/upstream.h"
+#include "config/config.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

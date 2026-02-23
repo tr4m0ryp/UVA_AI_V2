@@ -1,5 +1,5 @@
-#include "webui.h"
-#include "platform.h"
+#include "webui/webui.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <string.h>
 #include <curl/curl.h>

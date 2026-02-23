@@ -1,14 +1,9 @@
-#include "responses.h"
-#include "responses_internal.h"
-#include "translator.h"
-#include "thread_state.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <json-c/json.h>
-
-/* actions.c */
-char *actions_get_or_create_thread(void);
 
 /* Parse the incoming Responses API request body.
  * Returns 0 on success and fills req. */
@@ -146,69 +141,6 @@ char *resp_build_nonstream_response(const resp_result_t *r,
     char *result = strdup(s);
     json_object_put(obj);
     return result;
-}
-
-/* Parse tool calls from buffered text, populate result. Returns count. */
-int resp_try_parse_tools(resp_result_t *result)
-{
-    if (!result->full_text || !result->full_text[0])
-        return 0;
-    resp_tool_call_t calls[RESP_MAX_TOOL_CALLS];
-    int n = resp_parse_tool_calls(result->full_text, calls,
-                                   RESP_MAX_TOOL_CALLS);
-    if (n > 0) {
-        result->tool_call_count = n;
-        memcpy(result->tool_calls, calls,
-               (size_t)n * sizeof(resp_tool_call_t));
-        char *stripped = resp_strip_tool_calls(result->full_text);
-        free(result->full_text);
-        result->full_text = stripped ? stripped : strdup("");
-    }
-    return n;
-}
-
-/* Translate messages and build UvA body, trying incremental mode first. */
-char *resp_build_and_translate(struct json_object *messages,
-                                const char *model,
-                                const resp_request_t *rr,
-                                const char *stored_tid,
-                                char *used_tid, size_t tid_sz)
-{
-    char *openai_body = resp_build_openai_body(messages, model, rr);
-    char *uva_body = NULL;
-    if (stored_tid && stored_tid[0]) {
-        int mlen = (int)json_object_array_length(messages);
-        const char *last_user = NULL;
-        for (int i = mlen - 1; i >= 0; i--) {
-            struct json_object *m = json_object_array_get_idx(
-                messages, (size_t)i);
-            struct json_object *role_o, *content_o;
-            if (json_object_object_get_ex(m, "role", &role_o) &&
-                strcmp(json_object_get_string(role_o), "user") == 0 &&
-                json_object_object_get_ex(m, "content", &content_o)) {
-                last_user = json_object_get_string(content_o);
-                break;
-            }
-        }
-        if (last_user) {
-            uva_body = translate_request_incremental(
-                last_user, "user", stored_tid, NULL);
-            if (uva_body) {
-                snprintf(used_tid, tid_sz, "%s", stored_tid);
-                fprintf(stderr, "  [responses] incremental mode: "
-                        "thread=%s\n", stored_tid);
-            }
-        }
-    }
-    if (!uva_body) {
-        char *tid = actions_get_or_create_thread();
-        uva_body = translate_request(openai_body, tid);
-        snprintf(used_tid, tid_sz, "%s", tid);
-        fprintf(stderr, "  [responses] full mode: thread=%s\n", tid);
-        free(tid);
-    }
-    free(openai_body);
-    return uva_body;
 }
 
 /*

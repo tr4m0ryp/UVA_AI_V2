@@ -1,5 +1,5 @@
-#include "responses.h"
-#include "responses_internal.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +105,7 @@ struct json_object *resp_input_to_messages(struct json_object *input,
                 if (json_object_object_get_ex(item, "content", &cnt) &&
                     json_object_is_type(cnt, json_type_array)) {
                     const char *r = json_object_get_string(role_obj);
+                    if (r && strcmp(r, "developer") == 0) r = "system";
                     const char *txt = extract_text_from_parts(cnt);
                     struct json_object *msg = json_object_new_object();
                     json_object_object_add(msg, "role",
@@ -113,7 +114,24 @@ struct json_object *resp_input_to_messages(struct json_object *input,
                         json_object_new_string(txt));
                     json_object_array_add(messages, msg);
                 } else {
-                    json_object_array_add(messages, json_object_get(item));
+                    /* Remap developer -> system for pass-through items */
+                    const char *r = json_object_get_string(role_obj);
+                    if (r && strcmp(r, "developer") == 0) {
+                        struct json_object *cnt_o;
+                        const char *c = "";
+                        if (json_object_object_get_ex(item, "content",
+                                                       &cnt_o))
+                            c = json_object_get_string(cnt_o);
+                        struct json_object *msg = json_object_new_object();
+                        json_object_object_add(msg, "role",
+                            json_object_new_string("system"));
+                        json_object_object_add(msg, "content",
+                            json_object_new_string(c ? c : ""));
+                        json_object_array_add(messages, msg);
+                    } else {
+                        json_object_array_add(messages,
+                            json_object_get(item));
+                    }
                 }
                 continue;
             }

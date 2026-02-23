@@ -1,4 +1,4 @@
-#include "think_parser.h"
+#include "upstream/think_parser.h"
 #include <stdlib.h>
 #include <string.h>
 

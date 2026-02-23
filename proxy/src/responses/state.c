@@ -1,5 +1,5 @@
-#include "responses.h"
-#include "database_internal.h"
+#include "responses/responses.h"
+#include "database/database_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

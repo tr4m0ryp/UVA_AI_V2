@@ -1,5 +1,5 @@
-#include "grading.h"
-#include "database_internal.h"
+#include "database/grading.h"
+#include "database/database_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

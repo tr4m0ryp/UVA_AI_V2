@@ -1,4 +1,4 @@
-#include "github.h"
+#include "github/github.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,7 +1,7 @@
-#include "dashboard.h"
-#include "database.h"
-#include "apikey.h"
-#include "server.h"
+#include "dashboard/dashboard.h"
+#include "database/database.h"
+#include "apikey/apikey.h"
+#include "server/server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

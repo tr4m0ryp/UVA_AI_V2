@@ -1,6 +1,6 @@
-#include "auth.h"
-#include "upstream.h"
-#include "platform.h"
+#include "auth/auth.h"
+#include "upstream/upstream.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

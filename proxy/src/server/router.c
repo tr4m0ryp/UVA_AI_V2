@@ -1,9 +1,9 @@
-#include "server.h"
-#include "translator.h"
-#include "upstream.h"
-#include "stream.h"
-#include "dashboard.h"
-#include "responses.h"
+#include "server/server.h"
+#include "translator/translator.h"
+#include "upstream/upstream.h"
+#include "stream/stream.h"
+#include "dashboard/dashboard.h"
+#include "responses/responses.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

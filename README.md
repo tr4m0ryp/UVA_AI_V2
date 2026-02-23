@@ -17,7 +17,7 @@ Self-service key management with security built in.
 - **SHA-256 hashed storage** -- Raw keys are never stored. The key is shown exactly once at creation time, then only the hash is kept.
 - **Per-key defaults** -- Each key carries its own model, temperature, max tokens, system prompt, and reasoning effort. These are used when the API request doesn't specify overrides.
 - **Enable / disable** -- Toggle keys on and off without deleting them. Useful for rotating keys or temporarily revoking access.
-- **Usage audit** -- Every request is logged with the API key ID, model used, input/output character counts, latency, and success status.
+- **Usage audit** -- Every request is logged with the API key ID, model used, prompt/completion token counts, and HTTP status.
 
 #### Creating a new key
 
@@ -27,7 +27,7 @@ Click **New Key** in the dashboard, give it a name, pick a default model and opt
 
 #### Managing existing keys
 
-The keys overview shows every key with its creation date, last-used model, total request count, and toggle to enable or disable it. Click any key to drill into per-day usage stats.
+The keys overview shows every key with its creation date, default model, last-used timestamp, and toggle to enable or disable it. Click any key to drill into per-day usage stats.
 
 ![API key management overview](docs/screenshots/api_keys.png)
 
@@ -49,11 +49,11 @@ A clean, modern dashboard that improves on UvA's default chat experience.
 
 - **Dashboard overview** -- At-a-glance stats showing your API keys, active keys, and available models.
 - **Per-key configuration** -- Create multiple API keys, each with its own default model, temperature, max tokens, system prompt, and reasoning effort. Use different configs for different tasks (one key for coding with GPT-5, another for quick questions with GPT-5 Nano).
-- **Usage analytics** -- Per-key metrics: total requests, success rate, average latency, output character volume, and a 14-day daily breakdown table. Know exactly how you're using the platform.
+- **Usage analytics** -- Per-key metrics: total requests, prompt tokens, completion tokens, and a 30-day daily breakdown table. Know exactly how you're using the platform.
 - **Model access** -- Browse and select from all available models, including ones UvA doesn't surface in their chat UI.
-- **Runnable code blocks** -- Code in AI responses can be executed directly in the interface. Task selection lets you choose between different coding, analysis, and reasoning tasks without leaving the chat.
+- **Streaming chat** -- Real-time SSE-based chat with model responses rendered as they arrive. Supports markdown rendering and code block highlighting.
 
-![Chat interface with runnable code and task selection](docs/screenshots/chat_interface.png)
+![Dashboard chat interface](docs/screenshots/chat_interface.png)
 
 ### Automated Assignment Grading
 
@@ -62,7 +62,7 @@ Built-in grading workflow for batch-processing student submissions with AI. Uplo
 - **Session management** -- Create, track, and manage grading sessions from the dashboard. Each session tracks submission count, results, and timestamps.
 - **Results storage** -- Grading results are stored as structured JSON in the local SQLite database, making them easy to export, query, and analyze.
 - **Submission tracking** -- Track the number of submissions processed per session with full audit history.
-- **Graded by GPT-5.1** -- Submissions are evaluated using GPT-5.1, which offers strong instruction-following and rubric adherence.
+- **Model-agnostic** -- Choose any available model to evaluate submissions. The grading system handles session management and result storage; the model is selected per session.
 
 ![Automated assignment grading session](docs/screenshots/automated_grading.png)
 
@@ -73,7 +73,7 @@ A background thread inside the proxy watches your local Chrome and Firefox cooki
 - **Polling monitor** -- Reads the Chrome/Firefox SQLite cookie database directly from the filesystem every 2 seconds. No browser extension required.
 - **Multi-browser support** -- Works with Google Chrome, Chromium, and Firefox on Linux and macOS.
 - **Validation** -- Each detected cookie is validated against UvA's upstream API before being applied, so stale or partial cookies are ignored.
-- **Auto-login flow** -- Running `./uva-proxy --login` opens a browser window pointing at `aichat.uva.nl`. Once you log in, the proxy captures the session cookie automatically and writes it to `proxy.env`.
+- **Auto-login flow** -- Running `./uva-proxy --login` scans your local Chrome and Firefox cookie databases for a valid UvA session. If found, the cookie is validated against the upstream API and written to `proxy.env`. If no valid cookie is found, manual extraction instructions are printed.
 
 ### Cloud Coding *(work in progress)*
 
@@ -95,7 +95,7 @@ The entire project was built by reverse-engineering UvA's AI Chat frontend:
 
 2. **Request format discovery** -- The upstream platform uses Vercel AI SDK v2 with a custom SSE format (`{"type":"text-delta","delta":"..."}`). Each request requires fresh UUID v4 identifiers for both the thread and message. The proxy generates these automatically.
 
-3. **Authentication chain** -- Users authenticate via Azure AD (UvA's SSO). The session cookie from `aichat.uva.nl` (`__Secure-next-auth.session-token`) is stored in `proxy.env` and injected into every upstream request. The proxy monitors cookie expiry and can re-authenticate automatically.
+3. **Authentication chain** -- Users authenticate via Azure AD (UvA's SSO). The session cookie from `aichat.uva.nl` (one of `next-auth.session-token`, `authjs.session-token`, or `__Secure-next-auth.session-token`) is stored in `proxy.env` and injected into every upstream request. The proxy monitors cookie expiry and can re-authenticate automatically.
 
 4. **Translation layer** -- The proxy translates bidirectionally between OpenAI and UvA formats:
    - OpenAI `messages` array becomes UvA's `{id, message, flags, overrides}` structure
@@ -187,13 +187,13 @@ To reset a running stack and restart cleanly:
 1. Open [https://aichat.uva.nl](https://aichat.uva.nl) in Chrome or Firefox.
 2. Log in with your UvA / HvA credentials (Azure AD).
 3. Open DevTools (`F12`) → Application → Cookies → `https://aichat.uva.nl`.
-4. Copy the **full value** of `__Secure-next-auth.session-token`.
+4. Copy the **full value** of `next-auth.session-token` (or `authjs.session-token` / `__Secure-next-auth.session-token`, whichever is present).
 5. Paste it into `proxy/proxy.env`:
    ```
-   UVA_SESSION_COOKIE="__Secure-next-auth.session-token=eyJ..."
+   UVA_SESSION_COOKIE="next-auth.session-token=eyJ..."
    ```
 
-Alternatively, run `./proxy/uva-proxy --login` after building -- this opens a browser and captures the cookie automatically.
+Alternatively, run `./proxy/uva-proxy --login` after building -- this scans your browser cookie databases and extracts the session automatically.
 
 ### Services
 
@@ -212,7 +212,7 @@ If you only need the API without the chat UI or coding tools:
 cd proxy
 make -j$(nproc)
 cp proxy.env.example proxy.env   # fill in your cookie
-./uva-proxy --port 8787 --headless
+./uva-proxy --port 8787 --headless --no-webui
 ```
 
 ### Logs

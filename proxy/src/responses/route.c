@@ -1,10 +1,10 @@
-#include "responses.h"
-#include "responses_internal.h"
-#include "server.h"
-#include "upstream.h"
-#include "apikey.h"
-#include "database.h"
-#include "thread_state.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
+#include "server/server.h"
+#include "upstream/upstream.h"
+#include "apikey/apikey.h"
+#include "database/database.h"
+#include "utils/thread_state.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,16 +17,19 @@ void response_send_error(int fd, int status, const char *message);
 void response_start_sse(int fd);
 void response_end_sse(int fd);
 
-static const char *REQUIRED_RETRY_MSG =
-    "Please use one of the available tools to complete this request.";
-
-/* route_helpers.c */
+/* route_tools.c */
 int   resp_try_parse_tools(resp_result_t *result);
 char *resp_build_and_translate(struct json_object *messages,
                                 const char *model,
                                 const resp_request_t *rr,
                                 const char *stored_tid,
                                 char *used_tid, size_t tid_sz);
+int   resp_continuation_check(struct json_object *messages,
+                               const resp_request_t *rr,
+                               const char *stored_tid,
+                               char *used_tid, size_t tid_sz,
+                               const char *cookie,
+                               resp_result_t *result);
 
 void handle_responses(http_request_t *req)
 {
@@ -152,39 +155,12 @@ void handle_responses(http_request_t *req)
         }
 
         resp_try_parse_tools(&result);
-        if (rr.tool_choice == RESP_TC_REQUIRED &&
-            result.tool_call_count == 0) {
-            fprintf(stderr, "  [responses] tool_choice=required, "
-                    "no tool calls -- retrying\n");
-
-            struct json_object *asst = json_object_new_object();
-            json_object_object_add(asst, "role",
-                json_object_new_string("assistant"));
-            json_object_object_add(asst, "content",
-                json_object_new_string(
-                    result.full_text ? result.full_text : ""));
-            json_object_array_add(messages, asst);
-
-            struct json_object *nudge = json_object_new_object();
-            json_object_object_add(nudge, "role",
-                json_object_new_string("user"));
-            json_object_object_add(nudge, "content",
-                json_object_new_string(REQUIRED_RETRY_MSG));
-            json_object_array_add(messages, nudge);
-
-            free(result.full_text);
-            result.full_text = NULL;
-            result.tool_call_count = 0;
-
-            uva_body = resp_build_and_translate(messages, rr.model, &rr,
+        if (result.tool_call_count == 0 &&
+            rr.tool_choice != RESP_TC_NONE) {
+            resp_continuation_check(messages, &rr,
                 stored_thread_id, used_thread_id,
-                sizeof(used_thread_id));
-            if (uva_body) {
-                rc = resp_handle_text_buffered(uva_body,
-                    resolved_key.user_session, rr.model, &result);
-                free(uva_body);
-                if (rc == 0) resp_try_parse_tools(&result);
-            }
+                sizeof(used_thread_id),
+                resolved_key.user_session, &result);
         }
         if (rr.stream) {
             response_start_sse(req->client_fd);

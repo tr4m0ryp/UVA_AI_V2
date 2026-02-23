@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_BROWSER_MONITOR_H
 #define UVA_PROXY_BROWSER_MONITOR_H
 
-#include "config.h"
+#include "config/config.h"
 #include <stddef.h>
 
 /* Opaque handle for a browser login session. */

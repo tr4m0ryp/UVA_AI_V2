@@ -1,5 +1,5 @@
-#include "vps.h"
-#include "config.h"
+#include "vps/vps.h"
+#include "config/config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

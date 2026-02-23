@@ -1,5 +1,5 @@
-#include "upstream.h"
-#include "idgen.h"
+#include "upstream/upstream.h"
+#include "utils/idgen.h"
 #include <stdlib.h>
 #include <string.h>
 

@@ -1,4 +1,4 @@
-#include "chat_thread.h"
+#include "upstream/chat_thread.h"
 #include <stdio.h>
 #include <string.h>
 #include <openssl/evp.h>

@@ -1,7 +1,7 @@
-#include "responses.h"
-#include "responses_internal.h"
-#include "upstream.h"
-#include "stream.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
+#include "upstream/upstream.h"
+#include "stream/stream.h"
 #include <stdlib.h>
 #include <string.h>
 

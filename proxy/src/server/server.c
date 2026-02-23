@@ -1,6 +1,6 @@
-#include "server.h"
-#include "config.h"
-#include "platform.h"
+#include "server/server.h"
+#include "config/config.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

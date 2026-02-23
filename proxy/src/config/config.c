@@ -1,5 +1,5 @@
-#include "config.h"
-#include "platform.h"
+#include "config/config.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

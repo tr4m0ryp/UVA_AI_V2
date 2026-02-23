@@ -1,10 +1,10 @@
-#include "dashboard.h"
-#include "database.h"
-#include "server.h"
-#include "upstream.h"
-#include "translator.h"
-#include "stream.h"
-#include "platform.h"
+#include "dashboard/dashboard.h"
+#include "database/database.h"
+#include "server/server.h"
+#include "upstream/upstream.h"
+#include "translator/translator.h"
+#include "stream/stream.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#include "thread_state.h"
-#include "database_internal.h"
+#include "utils/thread_state.h"
+#include "database/database_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,6 +1,6 @@
-#include "stream.h"
-#include "translator.h"
-#include "platform.h"
+#include "stream/stream.h"
+#include "translator/translator.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

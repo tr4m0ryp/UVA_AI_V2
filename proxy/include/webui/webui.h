@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_WEBUI_H
 #define UVA_PROXY_WEBUI_H
 
-#include "config.h"
+#include "config/config.h"
 
 /* Start Open WebUI in a background thread.
  * Runs first-time setup if needed, then spawns uvicorn.

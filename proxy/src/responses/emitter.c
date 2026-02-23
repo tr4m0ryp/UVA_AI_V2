@@ -1,6 +1,6 @@
-#include "responses.h"
-#include "responses_internal.h"
-#include "platform.h"
+#include "responses/responses.h"
+#include "responses/responses_internal.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,5 +1,5 @@
-#include "terminal.h"
-#include "websocket.h"
+#include "terminal/terminal.h"
+#include "websocket/websocket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

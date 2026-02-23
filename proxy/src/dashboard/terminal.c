@@ -1,10 +1,10 @@
-#include "dashboard.h"
-#include "project.h"
-#include "database.h"
-#include "server.h"
-#include "websocket.h"
-#include "terminal.h"
-#include "vps.h"
+#include "dashboard/dashboard.h"
+#include "database/project.h"
+#include "database/database.h"
+#include "server/server.h"
+#include "websocket/websocket.h"
+#include "terminal/terminal.h"
+#include "vps/vps.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

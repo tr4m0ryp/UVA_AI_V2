@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_AUTH_INTERNAL_H
 #define UVA_PROXY_AUTH_INTERNAL_H
 
-#include "config.h"
+#include "config/config.h"
 #include <stddef.h>
 
 /* browser.c -- Firefox cookie extraction */

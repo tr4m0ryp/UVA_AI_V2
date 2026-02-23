@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_APIKEY_H
 #define UVA_PROXY_APIKEY_H
 
-#include "database.h"
+#include "database/database.h"
 
 #define APIKEY_LOCAL      "uva-local"
 #define APIKEY_PREFIX     "uva-sk-"

@@ -1,7 +1,7 @@
 #ifndef UVA_PROXY_WEBSOCKET_H
 #define UVA_PROXY_WEBSOCKET_H
 
-#include "server.h"
+#include "server/server.h"
 #include <stddef.h>
 #include <stdint.h>
 

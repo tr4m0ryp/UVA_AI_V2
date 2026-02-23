@@ -1,5 +1,5 @@
-#include "server.h"
-#include "platform.h"
+#include "server/server.h"
+#include "platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
