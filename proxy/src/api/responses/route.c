@@ -120,12 +120,25 @@ void handle_responses(http_request_t *req)
     if (inject_tools) {
         char *tool_prompt = resp_build_tool_prompt(rr.tools_json);
         if (tool_prompt) {
+            /* Prepend as first message so translate_request() labels it
+               [SYSTEM] and the user query stays as final_content.
+               Appending at the end caused it to be labeled [USER],
+               which smarter models rejected as prompt injection. */
             struct json_object *sys = json_object_new_object();
             json_object_object_add(sys, "role",
                 json_object_new_string("system"));
             json_object_object_add(sys, "content",
                 json_object_new_string(tool_prompt));
-            json_object_array_add(messages, sys);
+
+            struct json_object *new_msgs = json_object_new_array();
+            json_object_array_add(new_msgs, sys);
+            int mlen = (int)json_object_array_length(messages);
+            for (int i = 0; i < mlen; i++)
+                json_object_array_add(new_msgs,
+                    json_object_get(json_object_array_get_idx(
+                        messages, (size_t)i)));
+            json_object_put(messages);
+            messages = new_msgs;
             free(tool_prompt);
         }
     }

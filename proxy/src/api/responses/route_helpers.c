@@ -82,6 +82,15 @@ int resp_parse_request(struct json_object *parsed, resp_request_t *req)
                 json_object_get_string(tc_obj), req->tool_choice);
     }
 
+    /* API consumers typically integrate with external tools, so force
+       required when tools are present to ensure the model produces
+       tool_call blocks via the retry/nudge mechanism. */
+    if (req->has_tools && req->tool_choice == RESP_TC_AUTO) {
+        req->tool_choice = RESP_TC_REQUIRED;
+        fprintf(stderr, "  [responses] tools present: "
+                "forcing tool_choice auto -> required\n");
+    }
+
     return 0;
 }
 

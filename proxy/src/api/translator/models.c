@@ -12,21 +12,24 @@
  * We expose the same IDs plus common aliases.
  */
 /*
- * Models confirmed available on aichat.uva.nl as of 2026-02-18.
- * Verified via fetchAvailableModelsAction + end-to-end chat tests.
- * Claude, Llama, o3/o1, mistral-large (UvA provider down), and older GPT
- * variants have been removed.  Only models that return valid responses
- * are listed here.
+ * Models confirmed available on aichat.uva.nl as of 2026-03-11.
+ * Verified via direct API calls to /api/v1/chat.
+ * Only models that return valid responses are listed here.
  */
 static const model_mapping_t g_models[] = {
     /* OpenAI GPT-5 family */
     {"gpt-5",               "gpt-5",               "GPT-5"},
     {"gpt-5.1",             "gpt-5.1",             "GPT-5.1"},
+    {"gpt-5.2",             "gpt-5.2",             "GPT-5.2"},
     {"gpt-5-mini",          "gpt-5-mini",          "GPT-5 Mini"},
     {"gpt-5-nano",          "gpt-5-nano",          "GPT-5 Nano"},
     /* OpenAI GPT-4 family */
     {"gpt-4.1",             "gpt-4.1",             "GPT-4.1"},
     {"gpt-4o",              "gpt-4o",              "GPT-4o"},
+    /* Anthropic Claude */
+    {"claude-sonnet-4.6",   "claude-sonnet-4.6",   "Claude Sonnet 4.6"},
+    {"claude-sonnet-4.5",   "claude-sonnet-4.5",   "Claude Sonnet 4.5"},
+    {"claude-haiku-4.5",    "claude-haiku-4.5",    "Claude Haiku 4.5"},
     /* Open source */
     {"gpt-oss-120b",        "gpt-oss-120b",        "GPT-OSS 120B"},
 };

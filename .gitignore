@@ -45,6 +45,9 @@ vendor/open-webui/build/
 vendor/open-webui/backend/data/
 vendor/open-webui/.venv/
 
+# ─── UvA frontend source extraction ──────────────────────────────────────────
+UVAAI/
+
 # ─── OS / editor ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
